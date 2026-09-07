@@ -21,7 +21,6 @@ public partial class SonolumeView : UserControl
     private readonly SonolumeSession session;
     private readonly DispatcherTimer previewTimer;
     private readonly DispatcherTimer editorTimer;
-    private bool sliderInitialized;
 
     private Project? projectSnapshot;
     private SelectionKind currentKind = SelectionKind.None;
@@ -71,11 +70,6 @@ public partial class SonolumeView : UserControl
         if (snapshot is not null)
         {
             if (!ProjectNameBox.IsFocused) ProjectNameBox.Text = snapshot.ProjectName;
-            if (!sliderInitialized && snapshot.Zones.Count > 0)
-            {
-                sliderInitialized = true;
-                DecaySlider.Value = snapshot.Zones[0].DecaySeconds;
-            }
         }
 
         StatusText.Text = Describe(session.Sink.Status);
@@ -89,13 +83,6 @@ public partial class SonolumeView : UserControl
         SinkState.Error => $"SignalRGB: {status.Message}",
         _ => "SignalRGB: connecting...",
     };
-
-    private void DecaySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
-    {
-        if (DecayText is null) return;
-        DecayText.Text = $"{e.NewValue * 1000:0} ms";
-        if (sliderInitialized) session.SetDecaySeconds((float)e.NewValue);
-    }
 
     // --- Zone/group editor: bottom + right panels ---
 
@@ -564,8 +551,14 @@ public partial class SonolumeView : UserControl
                 continue;
             }
 
-            var row = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
-            var label = new TextBlock { Text = info.Id.ToString(), Width = 100, VerticalAlignment = VerticalAlignment.Center };
+            if (info.Id is ParamId.Active)
+            {
+                panel.Children.Add(BuildActiveRow(values, onChange));
+                continue;
+            }
+
+            var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
+            var label = new TextBlock { Text = info.Id.ToString(), Width = 100, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
             var valueText = new TextBlock { Width = 50, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush, Text = Fmt(values[info.Id]) };
             var slider = new Slider
             {
@@ -573,6 +566,7 @@ public partial class SonolumeView : UserControl
                 Maximum = info.Max,
                 Value = values[info.Id],
                 VerticalAlignment = VerticalAlignment.Center,
+                IsEnabled = info.Id is not (ParamId.EffectSpeed or ParamId.PosX or ParamId.PosY),
             };
             slider.ValueChanged += (_, e) =>
             {
@@ -589,10 +583,24 @@ public partial class SonolumeView : UserControl
         }
     }
 
+    private static UIElement BuildActiveRow(ParamSet values, Action<ParamId, float> onChange)
+    {
+        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var label = new TextBlock { Text = "Active", Width = 100, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
+        var checkBox = new CheckBox { IsChecked = values[ParamId.Active] >= 0.5f, VerticalAlignment = VerticalAlignment.Center };
+        checkBox.Checked += (_, _) => onChange(ParamId.Active, 1f);
+        checkBox.Unchecked += (_, _) => onChange(ParamId.Active, 0f);
+
+        DockPanel.SetDock(label, Dock.Left);
+        row.Children.Add(label);
+        row.Children.Add(checkBox);
+        return row;
+    }
+
     private static UIElement BuildColorRow(ParamSet values, Action<ParamId, float> onChange)
     {
-        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
-        stack.Children.Add(new TextBlock { Text = "Color", Margin = new Thickness(0, 0, 0, 6) });
+        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 16) };
+        stack.Children.Add(new TextBlock { Text = "Color", Foreground = MutedBrush, Margin = new Thickness(0, 0, 0, 8) });
 
         var picker = new ColorPickerControl();
         picker.SetColor(values[ParamId.Hue], values[ParamId.Saturation], values[ParamId.Brightness]);
@@ -600,7 +608,7 @@ public partial class SonolumeView : UserControl
 
         var hsbText = new TextBlock
         {
-            Margin = new Thickness(0, 6, 0, 0),
+            Margin = new Thickness(0, 8, 0, 0),
             Foreground = MutedBrush,
             FontFamily = new FontFamily("Consolas"),
             Text = FormatHsb(values[ParamId.Hue], values[ParamId.Saturation], values[ParamId.Brightness]),

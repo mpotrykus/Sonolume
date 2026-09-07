@@ -159,8 +159,6 @@ public sealed class Engine
 
     public void SetParam(TargetRef target, ParamId id, float raw) => compositor.SetParam(target, id, raw);
 
-    public void SetParamAllZones(ParamId id, float raw) => compositor.SetParamAllZones(id, raw);
-
     public void AddMapping(Mapping mapping)
     {
         Project.Mappings.Add(mapping);

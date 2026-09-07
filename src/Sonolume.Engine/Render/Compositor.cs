@@ -144,11 +144,6 @@ public sealed class Compositor
         }
     }
 
-    public void SetParamAllZones(ParamId id, float raw)
-    {
-        foreach (var z in zones) z.Zone.Params[id] = raw;
-    }
-
     /// <summary>Advances effects and re-renders every zone. Returns true when any zone differs from what was last collected.</summary>
     public bool Update(float dt)
     {

@@ -4,7 +4,7 @@
              xmlns:local="clr-namespace:Sonolume.UI"
              Background="#1B1B20"
              Foreground="#E6E6EA"
-             FontFamily="Segoe UI"
+             FontFamily="Segoe UI Variable Text, Segoe UI"
              FontSize="12"
              MinWidth="820" MinHeight="560"
              PreviewKeyDown="SonolumeView_PreviewKeyDown">
@@ -15,65 +15,109 @@
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </UserControl.Resources>
-    <Grid Margin="12">
+    <Grid Margin="18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <DockPanel Grid.Row="0" LastChildFill="False" Margin="0,0,0,10">
-            <TextBlock Text="Sonolume" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" DockPanel.Dock="Left" />
-            <TextBox x:Name="ProjectNameBox" DockPanel.Dock="Left" Width="150" Margin="10,0,0,0" VerticalAlignment="Center"
-                     LostFocus="ProjectNameBox_Commit" KeyDown="ProjectNameBox_KeyDown" />
-            <TextBlock x:Name="StatusText" DockPanel.Dock="Right" VerticalAlignment="Center" Foreground="#9A9AA3" TextAlignment="Right" />
-            <Button x:Name="RedoButton" DockPanel.Dock="Right" Content="Redo" Margin="8,0,0,0" Padding="10,3" Click="Redo_Click" />
-            <Button x:Name="UndoButton" DockPanel.Dock="Right" Content="Undo" Margin="8,0,0,0" Padding="10,3" Click="Undo_Click" />
-            <Button DockPanel.Dock="Right" Content="Save As..." Margin="8,0,0,0" Padding="10,3" Click="SaveAs_Click" />
-            <Button x:Name="SaveButton" DockPanel.Dock="Right" Content="Save" Margin="16,0,0,0" Padding="10,3" Click="Save_Click" />
-            <Button DockPanel.Dock="Right" Content="Open..." Margin="8,0,0,0" Padding="10,3" Click="Open_Click" />
-            <Button DockPanel.Dock="Right" Content="New" Margin="8,0,0,0" Padding="10,3" Click="New_Click" />
-        </DockPanel>
+        <StackPanel Grid.Row="0">
+            <DockPanel LastChildFill="False">
+                <Ellipse DockPanel.Dock="Left" Width="10" Height="10" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center">
+                    <Ellipse.Effect>
+                        <DropShadowEffect Color="{StaticResource AccentColor}" Opacity="0.8" BlurRadius="10" ShadowDepth="0" />
+                    </Ellipse.Effect>
+                </Ellipse>
+                <TextBlock Text="Sonolume" Style="{StaticResource TitleTextStyle}" VerticalAlignment="Center" Margin="10,0,0,0" DockPanel.Dock="Left" />
+                <TextBox x:Name="ProjectNameBox" DockPanel.Dock="Left" Width="160" Margin="16,0,0,0" VerticalAlignment="Center"
+                         LostFocus="ProjectNameBox_Commit" KeyDown="ProjectNameBox_KeyDown" />
 
-        <Grid Grid.Row="1">
+                <Button x:Name="RedoButton" DockPanel.Dock="Right" Margin="6,0,0,0" Click="Redo_Click" ToolTip="Redo">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7A6;" Style="{StaticResource IconGlyphStyle}" />
+                        <TextBlock Text="Redo" Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="UndoButton" DockPanel.Dock="Right" Click="Undo_Click" ToolTip="Undo">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7A7;" Style="{StaticResource IconGlyphStyle}" />
+                        <TextBlock Text="Undo" Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Border DockPanel.Dock="Right" Style="{StaticResource VerticalDividerStyle}" />
+
+                <Button x:Name="SaveButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButtonStyle}" Margin="6,0,0,0" Click="Save_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE74E;" Style="{StaticResource IconGlyphStyle}" Foreground="White" />
+                        <TextBlock Text="Save" Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button DockPanel.Dock="Right" Click="SaveAs_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE792;" Style="{StaticResource IconGlyphStyle}" />
+                        <TextBlock Text="Save As..." Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Border DockPanel.Dock="Right" Style="{StaticResource VerticalDividerStyle}" />
+
+                <Button DockPanel.Dock="Right" Margin="6,0,0,0" Click="Open_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE8E5;" Style="{StaticResource IconGlyphStyle}" />
+                        <TextBlock Text="Open..." Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+                <Button DockPanel.Dock="Right" Click="New_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE7C3;" Style="{StaticResource IconGlyphStyle}" />
+                        <TextBlock Text="New" Margin="6,0,0,0" />
+                    </StackPanel>
+                </Button>
+            </DockPanel>
+            <Border Style="{StaticResource HorizontalDividerStyle}" Margin="0,16,0,0" />
+        </StackPanel>
+
+        <Grid Grid.Row="1" Margin="0,20,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="10" />
-                <ColumnDefinition Width="280" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="300" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
                 <RowDefinition Height="*" />
-                <RowDefinition Height="10" />
+                <RowDefinition Height="16" />
                 <RowDefinition Height="240" />
             </Grid.RowDefinitions>
 
-            <local:PreviewControl x:Name="Preview" Grid.Row="0" Grid.Column="0" />
+            <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource PanelBorderStyle}" Padding="6">
+                <local:PreviewControl x:Name="Preview" />
+            </Border>
 
             <!-- Bottom menu: zones/groups list (left) and the selected item's Name/Group/Rect/Cell grid (right) -->
-            <Border Grid.Row="2" Grid.Column="0" Background="#24242B" CornerRadius="4">
+            <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource PanelBorderStyle}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <Grid Margin="12">
+                    <Grid Margin="16">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="20" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
 
                         <StackPanel Grid.Column="0">
-                            <DockPanel LastChildFill="True" Margin="0,0,0,4">
-                                <TextBlock Text="Zones" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <DockPanel LastChildFill="True" Margin="0,0,0,6">
+                                <TextBlock Text="Zones" Style="{StaticResource SectionHeaderTextStyle}" VerticalAlignment="Center" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                                    <Button Content="+" Width="24" Margin="4,0,0,0" Style="{StaticResource IconButtonStyle}" Click="AddZone_Click" />
-                                    <Button Content="-" Width="24" Margin="4,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveZone_Click" />
+                                    <Button Content="&#xE710;" Style="{StaticResource IconButtonStyle}" Click="AddZone_Click" ToolTip="Add zone" />
+                                    <Button Content="&#xE738;" Margin="6,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveZone_Click" ToolTip="Remove zone" />
                                 </StackPanel>
                             </DockPanel>
-                            <ListBox x:Name="ZoneList" DisplayMemberPath="Name" MaxHeight="150" Margin="0,0,0,10" SelectionChanged="ZoneList_SelectionChanged" />
+                            <ListBox x:Name="ZoneList" DisplayMemberPath="Name" MaxHeight="150" Margin="0,0,0,20" SelectionChanged="ZoneList_SelectionChanged" />
 
-                            <DockPanel LastChildFill="True" Margin="0,0,0,4">
-                                <TextBlock Text="Groups" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <DockPanel LastChildFill="True" Margin="0,0,0,6">
+                                <TextBlock Text="Groups" Style="{StaticResource SectionHeaderTextStyle}" VerticalAlignment="Center" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                                    <Button Content="+" Width="24" Margin="4,0,0,0" Style="{StaticResource IconButtonStyle}" Click="AddGroup_Click" />
-                                    <Button Content="-" Width="24" Margin="4,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveGroup_Click" />
+                                    <Button Content="&#xE710;" Style="{StaticResource IconButtonStyle}" Click="AddGroup_Click" ToolTip="Add group" />
+                                    <Button Content="&#xE738;" Margin="6,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveGroup_Click" ToolTip="Remove group" />
                                 </StackPanel>
                             </DockPanel>
                             <ListBox x:Name="GroupList" DisplayMemberPath="Name" MaxHeight="150" SelectionChanged="GroupList_SelectionChanged" />
@@ -81,27 +125,27 @@
 
                         <StackPanel Grid.Column="2">
                             <StackPanel x:Name="ZoneFieldsPanel" Visibility="Collapsed">
-                                <TextBlock Text="Zone" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                <TextBlock Text="Zone" Style="{StaticResource PanelHeaderTextStyle}" />
 
-                                <DockPanel Margin="0,0,0,6">
-                                    <TextBlock Text="Name" Width="70" VerticalAlignment="Center" />
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Name" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
                                     <TextBox x:Name="ZoneNameBox" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
                                 </DockPanel>
 
-                                <DockPanel Margin="0,0,0,6">
-                                    <TextBlock Text="Group" Width="70" VerticalAlignment="Center" />
+                                <DockPanel Margin="0,0,0,16">
+                                    <TextBlock Text="Group" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
                                     <ComboBox x:Name="ZoneGroupCombo" DisplayMemberPath="Name" SelectionChanged="ZoneGroupCombo_SelectionChanged" />
                                 </DockPanel>
 
-                                <TextBlock Text="Rect: X, Y, W, H (0..1)" Margin="0,6,0,4" Foreground="#9A9AA3" />
-                                <Grid Margin="0,0,0,6">
+                                <TextBlock Text="Rect: X, Y, W, H (0..1)" Style="{StaticResource CaptionTextStyle}" Margin="0,0,0,6" />
+                                <Grid Margin="0,0,0,16">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="6" />
+                                        <ColumnDefinition Width="8" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="6" />
+                                        <ColumnDefinition Width="8" />
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="6" />
+                                        <ColumnDefinition Width="8" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBox x:Name="ZoneXBox" Grid.Column="0" ToolTip="X" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
@@ -110,11 +154,11 @@
                                     <TextBox x:Name="ZoneHBox" Grid.Column="6" ToolTip="H" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
                                 </Grid>
 
-                                <TextBlock Text="Cell grid: columns, rows" Margin="0,6,0,4" Foreground="#9A9AA3" />
+                                <TextBlock Text="Cell grid: columns, rows" Style="{StaticResource CaptionTextStyle}" Margin="0,0,0,6" />
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="6" />
+                                        <ColumnDefinition Width="8" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <TextBox x:Name="ZoneCellsWBox" Grid.Column="0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
@@ -123,22 +167,22 @@
                             </StackPanel>
 
                             <StackPanel x:Name="GroupFieldsPanel" Visibility="Collapsed">
-                                <TextBlock Text="Group" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10" />
+                                <TextBlock Text="Group" Style="{StaticResource PanelHeaderTextStyle}" />
 
-                                <DockPanel Margin="0,0,0,6">
-                                    <TextBlock Text="Name" Width="70" VerticalAlignment="Center" />
+                                <DockPanel Margin="0,0,0,8">
+                                    <TextBlock Text="Name" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
                                     <TextBox x:Name="GroupNameBox" LostFocus="GroupField_Commit" KeyDown="GroupField_KeyDown" />
                                 </DockPanel>
 
                                 <DockPanel>
-                                    <TextBlock Text="Parent" Width="70" VerticalAlignment="Center" />
+                                    <TextBlock Text="Parent" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
                                     <ComboBox x:Name="GroupParentCombo" DisplayMemberPath="Name" SelectionChanged="GroupParentCombo_SelectionChanged" />
                                 </DockPanel>
                             </StackPanel>
 
                             <StackPanel x:Name="EmptyFieldsPanel">
-                                <TextBlock Text="Select a zone or group to edit, or add a new one." Foreground="#9A9AA3" TextWrapping="Wrap" />
-                                <TextBlock Text="Tip: you can also drag a zone to move it, or drag its handles to resize it, directly on the live preview." Foreground="#9A9AA3" TextWrapping="Wrap" Margin="0,6,0,0" />
+                                <TextBlock Text="Select a zone or group to edit, or add a new one." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
+                                <TextBlock Text="Tip: you can also drag a zone to move it, or drag its handles to resize it, directly on the live preview." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,8,0,0" />
                             </StackPanel>
                         </StackPanel>
                     </Grid>
@@ -146,29 +190,28 @@
             </Border>
 
             <!-- Right menu: all params for the selected zone/group -->
-            <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="2" Background="#24242B" CornerRadius="4">
+            <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="2" Style="{StaticResource PanelBorderStyle}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="12">
-                        <TextBlock x:Name="ParamsTitle" Text="Params" FontSize="14" FontWeight="SemiBold" Margin="0,0,0,10" />
-                        <TextBlock x:Name="ParamsEmptyText" Text="Select a zone or group to edit its parameters." Foreground="#9A9AA3" TextWrapping="Wrap" />
+                    <StackPanel Margin="16">
+                        <TextBlock x:Name="ParamsTitle" Text="Params" Style="{StaticResource PanelHeaderTextStyle}" />
+                        <TextBlock x:Name="ParamsEmptyText" Text="Select a zone or group to edit its parameters." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
                         <StackPanel x:Name="ParamsPanel" />
                     </StackPanel>
                 </ScrollViewer>
             </Border>
         </Grid>
 
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Grid.Column="0" Text="Decay" VerticalAlignment="Center" />
-            <Slider x:Name="DecaySlider" Grid.Column="1" Margin="10,0" Minimum="0.02" Maximum="2" Value="0.25"
-                    VerticalAlignment="Center" ValueChanged="DecaySlider_ValueChanged" />
-            <TextBlock x:Name="DecayText" Grid.Column="2" Width="60" VerticalAlignment="Center" Text="250 ms" />
-            <TextBlock x:Name="MidiText" Grid.Column="3" Margin="16,0,0,0" VerticalAlignment="Center" Foreground="#9A9AA3" Text="MIDI: 0 events" />
-        </Grid>
+        <StackPanel Grid.Row="2" Margin="0,20,0,0">
+            <Border Style="{StaticResource HorizontalDividerStyle}" Margin="0,0,0,16" />
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="MidiText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource MutedTextStyle}" Text="MIDI: 0 events" />
+                <TextBlock x:Name="StatusText" Grid.Column="2" Margin="24,0,0,0" VerticalAlignment="Center" Style="{StaticResource MutedTextStyle}" />
+            </Grid>
+        </StackPanel>
     </Grid>
 </UserControl>

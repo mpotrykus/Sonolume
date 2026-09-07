@@ -91,13 +91,7 @@ public sealed class SonolumeSession : IDisposable
         HasUnsavedChanges = false;
     }
 
-    public void SetDecaySeconds(float seconds)
-    {
-        Runner.Post(e => e.SetParamAllZones(ParamId.EffectDecay, seconds));
-        HasUnsavedChanges = true;
-    }
-
-    /// <summary>Live parameter tweak (brightness, hue, ...). Not undoable, same as <see cref="SetDecaySeconds"/>.</summary>
+    /// <summary>Live parameter tweak (brightness, hue, ...). Not undoable.</summary>
     public void SetParam(TargetRef target, ParamId id, float raw)
     {
         Runner.Post(e => e.SetParam(target, id, raw));
