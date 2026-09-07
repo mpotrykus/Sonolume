@@ -12,7 +12,7 @@
   <ItemGroup>
     <PackageReference Include="AudioPlugSharp" Version="0.7.13" />
     <PackageReference Include="AudioPlugSharpVst3" Version="0.7.13" />
-    <PackageReference Include="AudioPlugSharpWPF" Version="0.7.13" />
+    <PackageReference Include="AudioPlugSharpWPF" Version="0.7.13" GeneratePathProperty="true" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sonolume.Engine\Sonolume.Engine.csproj" />
@@ -20,4 +20,19 @@
     <ProjectReference Include="..\Sonolume.Transport\Sonolume.Transport.csproj" />
     <ProjectReference Include="..\Sonolume.UI\Sonolume.UI.csproj" />
   </ItemGroup>
+
+  <!--
+    AudioPlugSharpWPF 0.7.13's package has no build/*.targets copy step (unlike AudioPlugSharp and
+    AudioPlugSharpVst3, which ship one), and the SDK treats this externally-resolved reference as
+    Private=false, so AudioPlugSharpWPF.dll never lands in the output directory on its own. The plugin
+    loads via a native VST3 bridge (not `dotnet exec`), so there is no dev-time NuGet-cache probing
+    fallback at load time - the DLL must physically sit next to Sonolume.dll.
+  -->
+  <Target Name="CopyAudioPlugSharpWPF" AfterTargets="Build;Publish">
+    <ItemGroup>
+      <_AudioPlugSharpWPFAsset Include="$(PkgAudioPlugSharpWPF)\lib\net10.0-windows7.0\AudioPlugSharpWPF.dll" />
+    </ItemGroup>
+    <Error Text="AudioPlugSharpWPF.dll not found at %(_AudioPlugSharpWPFAsset.Identity) - check the installed package version." Condition="!Exists('%(_AudioPlugSharpWPFAsset.Identity)')" />
+    <Copy SourceFiles="@(_AudioPlugSharpWPFAsset)" DestinationFolder="$(OutDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
