@@ -15,12 +15,18 @@ public sealed class SonolumeSession : IDisposable
     private readonly List<string> undoStack = new();
     private readonly List<string> redoStack = new();
 
+    /// <summary>Serialized project as of the last load/save, so <see cref="HasUnsavedChanges"/> reflects the actual
+    /// content rather than just undo-stack depth (e.g. undoing back to it, or editing back to the same values, both
+    /// count as clean).</summary>
+    private string savedSnapshot;
+
     public SonolumeSession(Project? project = null, HttpCanvasSinkOptions? sinkOptions = null)
     {
         InstanceId = Guid.NewGuid().ToString("N")[..8];
         Engine = new Engine.Engine(project ?? Project.CreateDefault(), instanceId: InstanceId);
         Sink = new HttpCanvasSink(sinkOptions ?? new HttpCanvasSinkOptions(InstanceId));
         Runner = new EngineRunner(Engine, Sink);
+        savedSnapshot = ProjectJson.Serialize(Engine.Project);
         Runner.Start();
     }
 
@@ -41,6 +47,14 @@ public sealed class SonolumeSession : IDisposable
     /// not persisted and not part of undo/redo.</summary>
     public string? SelectedZoneId { get; set; }
 
+    /// <summary>Path last opened or saved to, so "Save" can write back without prompting. UI-thread-only;
+    /// not persisted and not part of undo/redo.</summary>
+    public string? CurrentFilePath { get; set; }
+
+    /// <summary>True while the project differs from what was last loaded/saved, so "Save" can disable itself
+    /// when there is nothing to write (including after undoing back to that point).</summary>
+    public bool HasUnsavedChanges { get; private set; }
+
     public void Enqueue(in MidiEvent e) => Runner.Enqueue(e);
 
     public string ExportProjectJson() => Runner.Invoke(e => ProjectJson.Serialize(e.Project));
@@ -53,21 +67,42 @@ public sealed class SonolumeSession : IDisposable
     public void ImportProjectJson(string json)
     {
         var project = ProjectJson.Deserialize(json);
+        savedSnapshot = ProjectJson.Serialize(project);
         Runner.Post(e => e.LoadProject(project));
         ClearHistory();
+        HasUnsavedChanges = false;
     }
 
     public void NewProject(string name)
     {
         var project = Project.CreateEmpty(name);
+        savedSnapshot = ProjectJson.Serialize(project);
         Runner.Post(e => e.LoadProject(project));
         ClearHistory();
+        CurrentFilePath = null;
+        HasUnsavedChanges = false;
     }
 
-    public void SetDecaySeconds(float seconds) => Runner.Post(e => e.SetParamAllZones(ParamId.EffectDecay, seconds));
+    /// <summary>Marks <paramref name="json"/> (just written to <see cref="CurrentFilePath"/>) as the clean point,
+    /// so "Save" disables itself again.</summary>
+    public void MarkSaved(string json)
+    {
+        savedSnapshot = json;
+        HasUnsavedChanges = false;
+    }
+
+    public void SetDecaySeconds(float seconds)
+    {
+        Runner.Post(e => e.SetParamAllZones(ParamId.EffectDecay, seconds));
+        HasUnsavedChanges = true;
+    }
 
     /// <summary>Live parameter tweak (brightness, hue, ...). Not undoable, same as <see cref="SetDecaySeconds"/>.</summary>
-    public void SetParam(TargetRef target, ParamId id, float raw) => Runner.Post(e => e.SetParam(target, id, raw));
+    public void SetParam(TargetRef target, ParamId id, float raw)
+    {
+        Runner.Post(e => e.SetParam(target, id, raw));
+        HasUnsavedChanges = true;
+    }
 
     public void AddZone(Zone zone) => MutateWithUndo(e => e.AddZone(zone));
 
@@ -93,6 +128,7 @@ public sealed class SonolumeSession : IDisposable
             PushCapped(redoStack, ProjectJson.Serialize(e.Project));
             e.LoadProject(ProjectJson.Deserialize(target));
         });
+        HasUnsavedChanges = target != savedSnapshot;
     }
 
     public void Redo()
@@ -105,6 +141,7 @@ public sealed class SonolumeSession : IDisposable
             PushCapped(undoStack, ProjectJson.Serialize(e.Project));
             e.LoadProject(ProjectJson.Deserialize(target));
         });
+        HasUnsavedChanges = target != savedSnapshot;
     }
 
     /// <summary>Snapshots the project before <paramref name="mutate"/> runs, then records that snapshot for undo
@@ -113,13 +150,16 @@ public sealed class SonolumeSession : IDisposable
     private void MutateWithUndo(Action<Engine.Engine> mutate)
     {
         string? before = null;
+        string? after = null;
         Runner.Invoke(e =>
         {
             before = ProjectJson.Serialize(e.Project);
             mutate(e);
+            after = ProjectJson.Serialize(e.Project);
         });
         PushCapped(undoStack, before!);
         redoStack.Clear();
+        HasUnsavedChanges = after != savedSnapshot;
     }
 
     private void ClearHistory()

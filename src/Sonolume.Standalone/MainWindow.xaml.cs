@@ -47,7 +47,4 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Open_Click(object sender, RoutedEventArgs e) => ProjectFileDialogs.Open(this, session);
-
-    private void Save_Click(object sender, RoutedEventArgs e) => ProjectFileDialogs.SaveAs(this, session);
 }
