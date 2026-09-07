@@ -551,8 +551,19 @@ public partial class SonolumeView : UserControl
     private void RebuildParamsPanel(StackPanel panel, ParamSet values, Action<ParamId, float> onChange)
     {
         panel.Children.Clear();
+        bool colorRowAdded = false;
         foreach (var info in ParamInfos.All)
         {
+            if (info.Id is ParamId.Hue or ParamId.Saturation or ParamId.Brightness)
+            {
+                if (!colorRowAdded)
+                {
+                    colorRowAdded = true;
+                    panel.Children.Add(BuildColorRow(values, onChange));
+                }
+                continue;
+            }
+
             var row = new DockPanel { Margin = new Thickness(0, 0, 0, 6) };
             var label = new TextBlock { Text = info.Id.ToString(), Width = 100, VerticalAlignment = VerticalAlignment.Center };
             var valueText = new TextBlock { Width = 50, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush, Text = Fmt(values[info.Id]) };
@@ -577,6 +588,36 @@ public partial class SonolumeView : UserControl
             panel.Children.Add(row);
         }
     }
+
+    private static UIElement BuildColorRow(ParamSet values, Action<ParamId, float> onChange)
+    {
+        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 10) };
+        stack.Children.Add(new TextBlock { Text = "Color", Margin = new Thickness(0, 0, 0, 6) });
+
+        var picker = new ColorPickerControl();
+        picker.SetColor(values[ParamId.Hue], values[ParamId.Saturation], values[ParamId.Brightness]);
+        stack.Children.Add(picker);
+
+        var hsbText = new TextBlock
+        {
+            Margin = new Thickness(0, 6, 0, 0),
+            Foreground = MutedBrush,
+            FontFamily = new FontFamily("Consolas"),
+            Text = FormatHsb(values[ParamId.Hue], values[ParamId.Saturation], values[ParamId.Brightness]),
+        };
+        picker.ColorChanged += (h, s, b) =>
+        {
+            hsbText.Text = FormatHsb(h, s, b);
+            onChange(ParamId.Hue, h);
+            onChange(ParamId.Saturation, s);
+            onChange(ParamId.Brightness, b);
+        };
+        stack.Children.Add(hsbText);
+        return stack;
+    }
+
+    private static string FormatHsb(float h, float s, float b) =>
+        string.Create(CultureInfo.InvariantCulture, $"H {h,4:0.00} | S {s,4:0.00} | B {b,4:0.00}");
 
     private static void SetGroupCombo(ComboBox combo, Project project, string? selectedId, string? excludeId)
     {
