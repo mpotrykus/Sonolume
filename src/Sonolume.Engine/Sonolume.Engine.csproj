@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Sonolume lighting engine: MIDI interpretation, mapping, lighting state, effects, frame encoding. No host, UI, or network dependencies.</Description>
+  </PropertyGroup>
+</Project>

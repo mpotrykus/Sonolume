@@ -1,0 +1,66 @@
+<head>
+  <title>Sonolume</title>
+  <meta description="Sonolume: MIDI-driven lighting from your DAW. Run the Sonolume plugin or standalone app; this effect paints the zones it sends over the SignalRGB Canvas API." />
+  <meta publisher="Sonolume" />
+
+  <meta property="interpolate" label="Smooth Between Frames" type="boolean" default="1" tooltip="Blend between engine frames at the display rate. Adds up to one frame interval of latency." />
+  <meta property="idle_color" label="Idle Color" type="color" default="#000000" tooltip="Shown when Sonolume is not running." />
+  <meta property="timeout_ms" label="Idle Timeout (ms)" type="number" min="500" max="10000" default="2000" tooltip="Fade to the idle color when no frame arrives for this long." />
+  <meta property="show_outlines" label="Show Zone Outlines" type="boolean" default="0" />
+  <meta property="show_debug" label="Show Debug Text" type="boolean" default="0" tooltip="Text is sampled onto your devices too. Turn off for performance." />
+
+  <style>
+    body { margin: 0; padding: 0; background: black; overflow: hidden; }
+    #debugInfo {
+      position: fixed; top: 4px; left: 4px; color: white; font-family: monospace; font-size: 11px;
+      z-index: 10; white-space: pre; text-shadow: 0 0 3px black, 0 0 3px black;
+    }
+    .fullscreen { width: 100%; height: 100%; display: block; position: fixed; top: 0; left: 0; }
+  </style>
+</head>
+
+<body>
+  <div id="debugInfo"></div>
+  <canvas id="mainCanvas" class="fullscreen"></canvas>
+</body>
+
+<script>
+/*__RENDERER__*/
+</script>
+
+<script>
+  window.addEventListener("load", function () {
+    var SENDER = "Sonolume";
+    var canvas = document.getElementById("mainCanvas");
+    var ctx = canvas.getContext("2d");
+    var debugEl = document.getElementById("debugInfo");
+    var renderer = window.SonolumeRenderer.create();
+
+    function resizeCanvas() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeCanvas);
+    resizeCanvas();
+
+    window.onCanvasApiEvent = function (apiEvent) {
+      if (!apiEvent || apiEvent.sender !== SENDER) return;
+      var ev = apiEvent.event;
+      renderer.handleEvent(typeof ev === "string" ? ev : JSON.stringify(ev));
+    };
+
+    function readBool(v) { return v === true || v === 1 || v === "1" || v === "true"; }
+
+    function update() {
+      renderer.render(ctx, canvas.width, canvas.height, {
+        interpolate: readBool(typeof interpolate !== "undefined" ? interpolate : 1),
+        idleColor: typeof idle_color !== "undefined" ? idle_color : "#000000",
+        timeoutMs: typeof timeout_ms !== "undefined" ? Number(timeout_ms) : 2000,
+        showOutlines: readBool(typeof show_outlines !== "undefined" ? show_outlines : 0)
+      });
+      debugEl.textContent = readBool(typeof show_debug !== "undefined" ? show_debug : 0) ? renderer.debugText() : "";
+      window.requestAnimationFrame(update);
+    }
+    window.requestAnimationFrame(update);
+  });
+</script>

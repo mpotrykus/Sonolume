@@ -1,0 +1,16 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Sonolume.Engine/Sonolume.Engine.csproj" />
+    <Project Path="src/Sonolume.Persist/Sonolume.Persist.csproj" />
+    <Project Path="src/Sonolume.Plugin/Sonolume.Plugin.csproj" />
+    <Project Path="src/Sonolume.Standalone/Sonolume.Standalone.csproj" />
+    <Project Path="src/Sonolume.Transport/Sonolume.Transport.csproj" />
+    <Project Path="src/Sonolume.UI/Sonolume.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Sonolume.Engine.Tests/Sonolume.Engine.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/Sonolume.MidiSend/Sonolume.MidiSend.csproj" />
+  </Folder>
+</Solution>

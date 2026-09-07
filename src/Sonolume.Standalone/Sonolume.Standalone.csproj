@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Description>Sonolume standalone app: direct MIDI input, no DAW required.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Melanchall.DryWetMidi" Version="8.0.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sonolume.Engine\Sonolume.Engine.csproj" />
+    <ProjectReference Include="..\Sonolume.Persist\Sonolume.Persist.csproj" />
+    <ProjectReference Include="..\Sonolume.Transport\Sonolume.Transport.csproj" />
+    <ProjectReference Include="..\Sonolume.UI\Sonolume.UI.csproj" />
+  </ItemGroup>
+</Project>

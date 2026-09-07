@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Sonolume project (preset) JSON persistence.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Sonolume.Engine\Sonolume.Engine.csproj" />
+  </ItemGroup>
+</Project>

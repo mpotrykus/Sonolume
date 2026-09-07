@@ -1,0 +1,818 @@
+# Sonolume
+
+I want you to design and build a project called **Sonolume**.
+
+## Product concept
+
+Sonolume is a **MIDI-driven lighting system for DAWs**, with **SignalRGB acting as the final lighting/hardware layer**.
+
+The fundamental concept is:
+
+**DAW → Sonolume → SignalRGB Canvas → physical RGB devices**
+
+The goal is to allow music being created or performed inside a DAW to control lighting in a sophisticated, musical, configurable way.
+
+The system should ultimately allow MIDI notes, velocity, CCs, pitch, aftertouch, automation, etc. to control arbitrary lighting zones, colors, brightness, and visual effects.
+
+Sonolume should not be tightly coupled to any particular RGB hardware. SignalRGB should handle the hardware abstraction and physical device mapping.
+
+---
+
+# Important architectural decision
+
+## Do NOT introduce a middleware service initially
+
+We considered an architecture involving:
+
+```text
+DAW
+ ↓
+Sonolume middleware service
+ ↓
+SignalRGB
+```
+
+We have decided that this is **not necessary for the initial version**.
+
+The preferred initial architecture is:
+
+```text
+DAW
+ │
+ │ MIDI
+ ▼
+Sonolume VST
+ │
+ │ direct communication
+ ▼
+SignalRGB Canvas
+ │
+ │ SignalRGB device mapping
+ ▼
+RGB hardware
+```
+
+The Sonolume VST should contain the necessary Sonolume logic rather than requiring a separate always-running middleware application.
+
+However, **do not tightly couple the internal Sonolume lighting engine to the VST implementation**.
+
+The conceptual architecture should remain separable:
+
+```text
+MIDI / DAW input
+       ↓
+MIDI interpretation
+       ↓
+Mapping engine
+       ↓
+Lighting state
+       ↓
+Effect / animation system
+       ↓
+Canvas representation
+       ↓
+SignalRGB
+```
+
+This leaves open the possibility of extracting the Sonolume engine into a standalone service later if future requirements justify it.
+
+Do not implement a middleware service merely for architectural purity.
+
+---
+
+# Confirmed SignalRGB capability
+
+We have already independently confirmed that **externally driven SignalRGB canvases work**.
+
+Do NOT spend the initial investigation trying to determine whether the fundamental concept is possible.
+
+There is an existing proof of concept on the development machine.
+
+Relevant files:
+
+```text
+D:\Documents\WhirlwindFX\Effects\web-video-pixelstream-sampler.ps1
+
+D:\Documents\WhirlwindFX\Effects\web_video_test - pixel stream canvas.html
+```
+
+These files demonstrate the existing externally driven canvas approach.
+
+**Inspect these files first.**
+
+Understand:
+
+* how the external process communicates with the canvas
+* how the canvas receives external data
+* how pixel data is represented
+* how the canvas renders that data
+* update frequency
+* lifecycle behavior
+* any assumptions or limitations
+* what portions can be reused for Sonolume
+* what portions should be replaced
+
+Do not discard this PoC and reinvent the SignalRGB integration without first understanding it.
+
+The PoC is evidence that the fundamental SignalRGB external-canvas pathway is viable.
+
+---
+
+# Core user experience
+
+A user should be able to:
+
+1. Run their DAW.
+2. Load Sonolume as a VST instrument/plugin.
+3. Have MIDI from the DAW reach Sonolume.
+4. Define arbitrary lighting zones on a Sonolume canvas.
+5. Map MIDI events and parameters to those zones.
+6. Control:
+
+   * brightness
+   * color
+   * hue
+   * saturation
+   * effect
+   * effect intensity
+   * effect speed
+   * effect decay
+   * position
+   * other useful lighting parameters
+7. Have MIDI notes trigger lighting events.
+8. Have MIDI velocity influence event intensity.
+9. Map MIDI CCs to continuous lighting parameters.
+10. Use MIDI Learn to assign MIDI controls to lighting parameters.
+11. Use different mappings/presets for different musical setups.
+12. Have the resulting visual canvas appear in SignalRGB.
+13. Allow SignalRGB to map the visual canvas to the user's physical RGB devices.
+
+The user should not need to configure individual RGB hardware inside Sonolume.
+
+---
+
+# SignalRGB integration
+
+SignalRGB is the **hardware abstraction layer**.
+
+Sonolume should produce a virtual visual representation and communicate that representation to SignalRGB's externally driven canvas mechanism.
+
+The desired conceptual flow is:
+
+```text
+DAW
+ │
+ │ MIDI
+ ▼
+Sonolume VST
+ │
+ │ external canvas data/events
+ ▼
+SignalRGB Canvas
+ │
+ │ SignalRGB mapping
+ ▼
+RGB hardware
+```
+
+Use the existing PoC as the starting point for understanding the actual communication mechanism.
+
+Determine the most appropriate way for Sonolume to communicate with the SignalRGB canvas based on the PoC and current SignalRGB behavior.
+
+Do not assume a particular transport, protocol, rendering strategy, programming language, framework, or plugin technology before investigating the requirements.
+
+---
+
+# Do not unnecessarily transmit rendered pixels
+
+Avoid assuming that Sonolume must send a complete rendered pixel frame every time something happens.
+
+Consider the distinction between:
+
+```text
+MIDI event
+```
+
+and:
+
+```text
+rendered visual frame
+```
+
+For example:
+
+```text
+MIDI Note On
+  ↓
+Kick triggered
+  ↓
+Kick effect begins
+  ↓
+effect animates
+  ↓
+visual canvas updates
+```
+
+The exact division of responsibility between Sonolume and the SignalRGB canvas should be determined based on performance, simplicity, and the existing PoC.
+
+The goal is smooth real-time lighting without unnecessarily moving large amounts of data.
+
+---
+
+# MIDI model
+
+MIDI should be treated as a general control system, not merely as note triggers.
+
+## MIDI Notes
+
+A MIDI note can trigger a zone or effect.
+
+Example:
+
+```text
+Note 36
+→ Kick zone
+→ Flash effect
+```
+
+Velocity should be available as a parameter:
+
+```text
+velocity 20  → low intensity
+velocity 127 → maximum intensity
+```
+
+## MIDI CC
+
+Continuous controllers should be mappable to parameters such as:
+
+* brightness
+* hue
+* saturation
+* effect amount
+* speed
+* decay
+* position
+* etc.
+
+Users should be able to map arbitrary CCs.
+
+Do not force a fixed CC layout.
+
+## MIDI Learn
+
+MIDI Learn is an important feature.
+
+A user should be able to select:
+
+```text
+Kick
+  Brightness
+    [Learn]
+```
+
+Then move a MIDI controller and have Sonolume identify the relevant MIDI control and create the mapping.
+
+The same concept should work for other parameters.
+
+## Pitch
+
+MIDI pitch should be usable as a control source.
+
+Potential examples:
+
+```text
+pitch → hue
+pitch → X position
+pitch → effect selection
+```
+
+## Aftertouch
+
+Aftertouch should be considered a useful expressive control source.
+
+## MIDI Channel
+
+MIDI channels should be available to the mapping system.
+
+## Automation
+
+The architecture should leave room for DAW automation and other continuous control sources.
+
+Do not design the system so that supporting these later requires replacing the fundamental mapping system.
+
+---
+
+# Zones
+
+Sonolume should have a concept of **Zones**.
+
+A Zone represents an arbitrary area of the Sonolume visual canvas.
+
+Example:
+
+```text
+┌────────────────────────────────────────┐
+│                                        │
+│       SYNTH              AMBIENT       │
+│                                        │
+│                                        │
+│                                        │
+│  KICK       SNARE        HI-HAT        │
+│                                        │
+│               BASS                     │
+│                                        │
+└────────────────────────────────────────┘
+```
+
+Zones should not inherently represent specific MIDI notes.
+
+Instead:
+
+```text
+MIDI mapping
+     ↓
+Zone
+     ↓
+parameter / behavior
+```
+
+A zone may have properties such as:
+
+* position
+* size
+* brightness
+* color
+* hue
+* saturation
+* active state
+* effect
+* effect parameters
+* etc.
+
+The zone system should be flexible enough to support useful spatial representations.
+
+---
+
+# Groups
+
+Zones should be able to belong to **Groups**.
+
+Example:
+
+```text
+Everything
+├── Drums
+│   ├── Kick
+│   ├── Snare
+│   └── Hi-Hat
+│
+└── Instruments
+    ├── Bass
+    ├── Synth
+    └── Pads
+```
+
+Groups should allow parameters to be controlled collectively.
+
+Example:
+
+```text
+CC 7 → Drums brightness
+```
+
+could affect all zones belonging to Drums.
+
+Hierarchical groups should be considered if appropriate.
+
+---
+
+# Mapping system
+
+The mapping system is one of the most important parts of Sonolume.
+
+Conceptually:
+
+```text
+MIDI source
+    ↓
+Mapping
+    ↓
+Parameter
+    ↓
+Zone / Group
+    ↓
+Effect / renderer
+```
+
+Mappings should support relationships such as:
+
+```text
+MIDI Note 36
+→ Kick
+→ trigger Flash
+→ velocity controls brightness
+```
+
+or:
+
+```text
+CC 74
+→ Kick
+→ Hue
+```
+
+or:
+
+```text
+CC 7
+→ Drums
+→ Brightness
+```
+
+Mappings should support useful transformations such as:
+
+* minimum/maximum ranges
+* inversion
+* scaling
+* curves
+* normalization
+* other appropriate transformations
+
+For example:
+
+```text
+MIDI 0–127
+→ brightness 10–100%
+```
+
+The exact representation should be determined by you.
+
+---
+
+# Events vs persistent parameters
+
+Preserve the conceptual distinction between **events** and **persistent state/parameters**.
+
+A MIDI Note On is fundamentally an event:
+
+```text
+Note On
+→ trigger effect
+```
+
+while a MIDI CC can represent persistent state:
+
+```text
+CC 7 = 80
+→ brightness = 80%
+```
+
+A note event may initiate an effect whose animation continues after the MIDI event itself ends.
+
+Example:
+
+```text
+Note On
+→ brightness rises immediately
+→ decays over 250 ms
+```
+
+The animation implementation is up to you.
+
+---
+
+# Effects
+
+Sonolume should have an extensible effect system.
+
+Potential effects include:
+
+* Flash
+* Pulse
+* Fade
+* Wave
+* Chase
+* Rainbow
+* Spectrum
+* other useful visual effects
+
+Effects should be capable of consuming MIDI-derived parameters.
+
+Examples:
+
+### Flash
+
+```text
+Note On
+→ brightness based on velocity
+→ decay over time
+```
+
+### Pulse
+
+```text
+Note On
+→ initiate pulse
+→ speed/amount configurable
+```
+
+### Spectrum
+
+Potentially:
+
+```text
+pitch → hue
+velocity → brightness
+```
+
+### Wave
+
+Potentially:
+
+```text
+note → wave origin
+velocity → amplitude
+```
+
+These are examples, not a fixed list.
+
+---
+
+# Color system
+
+Color should not be limited to raw RGB values.
+
+Users should be able to work with:
+
+* hue
+* saturation
+* brightness
+* RGB
+* palettes
+
+MIDI parameters should be capable of controlling color properties.
+
+A palette system would also be useful.
+
+For example, a palette could contain multiple colors and a MIDI parameter could control position within that palette.
+
+The exact color architecture is up to you.
+
+---
+
+# Canvas
+
+Sonolume should provide a visual canvas representing the current lighting state.
+
+The canvas is the conceptual bridge between Sonolume's musical logic and SignalRGB.
+
+It should support:
+
+* zones
+* groups
+* effects
+* animations
+* colors
+* brightness
+* spatial relationships
+
+The canvas should be useful for configuration and for observing the current lighting state.
+
+The system should be designed for real-time operation.
+
+---
+
+# Presets / configurations
+
+Users should be able to save and load complete lighting configurations.
+
+A preset may contain:
+
+* zones
+* groups
+* MIDI mappings
+* effects
+* colors
+* palettes
+* parameter ranges
+* MIDI Learn assignments
+* other configuration necessary to reproduce a setup
+
+Users should be able to create different presets for different songs, instruments, performances, or DAW projects.
+
+---
+
+# VST considerations
+
+The initial architecture should favor:
+
+```text
+DAW
+ ↓
+Sonolume VST
+ ↓
+SignalRGB
+```
+
+rather than requiring:
+
+```text
+DAW
+ ↓
+VST
+ ↓
+middleware service
+ ↓
+SignalRGB
+```
+
+However, keep the Sonolume lighting engine conceptually independent from the VST host layer.
+
+The VST should be treated as an interface into the Sonolume system rather than forcing every part of the application to be implemented specifically around plugin lifecycle constraints.
+
+Determine the appropriate implementation strategy yourself.
+
+Do not assume a particular VST framework or programming language.
+
+---
+
+# Future possibilities
+
+Do not necessarily implement these initially, but avoid architectural decisions that make them unnecessarily difficult:
+
+* OSC input
+* audio-reactive lighting
+* DMX
+* WLED
+* other lighting systems
+* additional DAW integrations
+* multiple MIDI sources
+* MIDI routing
+* MIDI output
+* song/project-specific presets
+* timeline synchronization
+* richer DAW automation
+* multiple canvases
+* 3D/spatial lighting
+* plugins/effect ecosystem
+* remote control
+* networked lighting
+
+The initial product should remain focused.
+
+---
+
+# Critical architectural principle
+
+Do not unnecessarily couple:
+
+```text
+MIDI
+```
+
+directly to:
+
+```text
+pixels
+```
+
+Instead, maintain a conceptual pipeline:
+
+```text
+MIDI input
+     ↓
+MIDI interpretation
+     ↓
+Mapping engine
+     ↓
+Lighting state
+     ↓
+Effect / animation system
+     ↓
+Canvas
+     ↓
+SignalRGB
+```
+
+This should allow future input sources to feed the same lighting system.
+
+Likewise, SignalRGB should ideally remain an output layer rather than being embedded throughout Sonolume's internal logic.
+
+---
+
+# Development strategy
+
+Before implementing the complete product:
+
+1. Inspect the existing SignalRGB PoC files.
+2. Understand exactly how the externally driven canvas works.
+3. Determine the minimum mechanism required to drive that canvas from Sonolume.
+4. Validate the direct:
+
+```text
+DAW / MIDI
+→ Sonolume
+→ SignalRGB
+```
+
+path.
+5. Build a minimal vertical slice before expanding the feature set.
+
+The first meaningful demonstration should be something like:
+
+```text
+DAW MIDI Note
+     ↓
+Sonolume
+     ↓
+Mapped Zone
+     ↓
+Visual effect
+     ↓
+SignalRGB Canvas
+     ↓
+Physical RGB lighting
+```
+
+For example:
+
+```text
+C1
+→ Kick
+→ red flash
+→ velocity controls brightness
+→ decay over time
+```
+
+Once that works reliably, expand into:
+
+* CC mappings
+* MIDI Learn
+* zones
+* groups
+* multiple effects
+* colors
+* presets
+* advanced MIDI sources
+* richer UI
+
+---
+
+# Technology decisions
+
+**Do not make coding decisions based solely on this prompt.**
+
+I intentionally do not prescribe:
+
+* programming language
+* framework
+* UI framework
+* VST implementation technology
+* plugin framework
+* rendering technology
+* IPC mechanism
+* networking mechanism
+* SignalRGB communication implementation
+* project structure
+* packaging
+* deployment
+
+Investigate the requirements and choose the technologies you believe are appropriate.
+
+Explain important tradeoffs before committing to major architectural decisions.
+
+Do not add a middleware service unless a concrete requirement demonstrates that the direct VST → SignalRGB architecture is insufficient.
+
+---
+
+# Product philosophy
+
+Sonolume should feel like a **musical instrument for lighting**, not merely a MIDI-to-RGB utility.
+
+The fundamental experience should be:
+
+> **I play music, and my lighting becomes part of the performance.**
+
+The project name is:
+
+# Sonolume
+
+Possible tagline:
+
+> **Turn sound into light.**
+
+Start by inspecting the existing PoC, analyzing the requirements, identifying the major architectural components, and proposing an implementation plan.
+
+Do not immediately start generating large amounts of code.
+
+First establish that you understand:
+
+1. what Sonolume is,
+2. why the direct VST → SignalRGB architecture is preferred,
+3. how the existing SignalRGB PoC works,
+4. what belongs in the Sonolume engine,
+5. what belongs in the SignalRGB canvas,
+6. and what should remain extensible for future versions.
+
+Then propose the smallest useful vertical slice that proves the complete system.
