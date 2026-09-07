@@ -12,6 +12,17 @@ public sealed class Zone
     public int CellsH { get; set; } = 1;
     public string? GroupId { get; set; }
     public ParamSet Params { get; set; } = new();
+
+    public Zone Clone() => new()
+    {
+        Id = Id,
+        Name = Name,
+        Rect = Rect,
+        CellsW = CellsW,
+        CellsH = CellsH,
+        GroupId = GroupId,
+        Params = Params.Clone(),
+    };
 }
 
 public sealed class Group
@@ -20,6 +31,14 @@ public sealed class Group
     public string Name { get; set; } = "";
     public string? ParentId { get; set; }
     public ParamSet Params { get; set; } = new();
+
+    public Group Clone() => new()
+    {
+        Id = Id,
+        Name = Name,
+        ParentId = ParentId,
+        Params = Params.Clone(),
+    };
 }
 
 public sealed class Palette

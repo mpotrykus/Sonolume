@@ -190,4 +190,82 @@ public class EngineTests
         engine.LoadProject(Project.CreateDefault());
         Assert.True(engine.LayoutChanged);
     }
+
+    [Fact]
+    public void AddZone_MarksLayoutChangedAndAppearsInLayout()
+    {
+        var engine = NewEngine();
+        engine.GetLayout();
+        Assert.False(engine.LayoutChanged);
+
+        engine.AddZone(new Zone { Id = "extra", Name = "Extra" });
+
+        Assert.True(engine.LayoutChanged);
+        var layout = engine.GetLayout();
+        Assert.Contains(layout.Zones, z => z.Id == "extra");
+    }
+
+    [Fact]
+    public void AddZone_DuplicateId_ThrowsAndDoesNotChangeLayout()
+    {
+        var engine = NewEngine();
+        engine.GetLayout();
+
+        Assert.Throws<InvalidDataException>(() => engine.AddZone(new Zone { Id = "kick" }));
+
+        Assert.False(engine.LayoutChanged);
+        Assert.Equal(3, engine.Project.Zones.Count);
+    }
+
+    [Fact]
+    public void RemoveZone_RemovesItFromLayoutAndFrames()
+    {
+        var engine = NewEngine();
+        engine.Tick(0f);
+        engine.TakeFrame(full: true);
+
+        engine.RemoveZone("kick");
+
+        var layout = engine.GetLayout();
+        Assert.DoesNotContain(layout.Zones, z => z.Id == "kick");
+
+        var frame = engine.TakeFrame(full: true);
+        Assert.DoesNotContain(frame!.Regions, r => r.ZoneId == "kick");
+    }
+
+    [Fact]
+    public void RemoveGroup_UngroupsZonesAndRebuildsRuntime()
+    {
+        var engine = NewEngine();
+        engine.SetParam(TargetRef.Group("drums"), ParamId.Brightness, 0.5f);
+
+        engine.RemoveGroup("drums");
+
+        Assert.Null(engine.Project.FindZone("kick")!.GroupId);
+        engine.Push(MidiEvent.NoteOn(0, 36, 1f, 0));
+        engine.Tick(0f);
+        var c = KickColor(engine);
+        Assert.Equal(255, c.R);
+    }
+
+    [Fact]
+    public void UpdateZone_AppliesChangeAndRebuildsRuntime()
+    {
+        var engine = NewEngine();
+        engine.UpdateZone("kick", z => z.Name = "Bass Drum");
+        Assert.Equal("Bass Drum", engine.Project.FindZone("kick")!.Name);
+        Assert.True(engine.LayoutChanged);
+    }
+
+    [Fact]
+    public void RenameProject_UpdatesNameAndMarksLayoutChanged()
+    {
+        var engine = NewEngine();
+        engine.GetLayout();
+
+        engine.RenameProject("New Name");
+
+        Assert.Equal("New Name", engine.Project.Name);
+        Assert.True(engine.LayoutChanged);
+    }
 }

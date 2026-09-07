@@ -57,4 +57,32 @@ public class ProjectJsonTests
         var json = ProjectJson.Serialize(project);
         Assert.Throws<InvalidDataException>(() => ProjectJson.Deserialize(json));
     }
+
+    [Fact]
+    public void UnknownZoneGroupId_IsRejected()
+    {
+        var project = Project.CreateDefault();
+        project.FindZone("kick")!.GroupId = "nope";
+        var json = ProjectJson.Serialize(project);
+        Assert.Throws<InvalidDataException>(() => ProjectJson.Deserialize(json));
+    }
+
+    [Fact]
+    public void UnknownGroupParentId_IsRejected()
+    {
+        var project = Project.CreateDefault();
+        project.Groups.Add(new Group { Id = "child", ParentId = "nope" });
+        var json = ProjectJson.Serialize(project);
+        Assert.Throws<InvalidDataException>(() => ProjectJson.Deserialize(json));
+    }
+
+    [Fact]
+    public void CyclicGroupParentChain_IsRejected()
+    {
+        var project = Project.CreateDefault();
+        project.Groups.Add(new Group { Id = "a", ParentId = "b" });
+        project.Groups.Add(new Group { Id = "b", ParentId = "a" });
+        var json = ProjectJson.Serialize(project);
+        Assert.Throws<InvalidDataException>(() => ProjectJson.Deserialize(json));
+    }
 }

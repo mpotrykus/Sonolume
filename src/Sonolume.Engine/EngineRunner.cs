@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
 using Sonolume.Engine.Core;
 using Sonolume.Engine.Input;
@@ -83,8 +84,26 @@ public sealed class EngineRunner : IDisposable
             finally { done.Set(); }
         });
         if (!done.Wait(timeoutMs)) throw new TimeoutException("Engine thread did not respond.");
-        if (error is not null) throw new InvalidOperationException("Engine action failed.", error);
+        if (error is not null) ExceptionDispatchInfo.Capture(error).Throw();
         return result!;
+    }
+
+    /// <summary>Runs an action on the engine thread and waits for it to finish. Use for edits that can throw
+    /// on validation (zone/group CRUD) so the original exception reaches the caller unwrapped.</summary>
+    public void Invoke(Action<Engine> action, int timeoutMs = 1000)
+    {
+        if (!running || Thread.CurrentThread == thread) { action(engine); return; }
+
+        using var done = new ManualResetEventSlim(false);
+        Exception? error = null;
+        Post(e =>
+        {
+            try { action(e); }
+            catch (Exception ex) { error = ex; }
+            finally { done.Set(); }
+        });
+        if (!done.Wait(timeoutMs)) throw new TimeoutException("Engine thread did not respond.");
+        if (error is not null) ExceptionDispatchInfo.Capture(error).Throw();
     }
 
     public void Start()

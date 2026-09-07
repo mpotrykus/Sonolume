@@ -45,8 +45,46 @@ public sealed class Engine
     public void LoadProject(Project project)
     {
         Project = project;
-        RebuildMappings();
-        compositor = new Compositor(project, Effects);
+        RebuildRuntime();
+    }
+
+    public void AddZone(Zone zone)
+    {
+        Project.AddZone(zone);
+        RebuildRuntime();
+    }
+
+    public void RemoveZone(string id)
+    {
+        if (Project.RemoveZone(id)) RebuildRuntime();
+    }
+
+    public void UpdateZone(string id, Action<Zone> apply)
+    {
+        Project.UpdateZone(id, apply);
+        RebuildRuntime();
+    }
+
+    public void AddGroup(Group group)
+    {
+        Project.AddGroup(group);
+        RebuildRuntime();
+    }
+
+    public void RemoveGroup(string id)
+    {
+        if (Project.RemoveGroup(id)) RebuildRuntime();
+    }
+
+    public void UpdateGroup(string id, Action<Group> apply)
+    {
+        Project.UpdateGroup(id, apply);
+        RebuildRuntime();
+    }
+
+    public void RenameProject(string name)
+    {
+        Project.Name = name;
         layoutDirty = true;
     }
 
@@ -155,5 +193,12 @@ public sealed class Engine
     {
         mappingEngine = new MappingEngine(Project.Mappings);
         compositor.RefreshEventDriven(Project.Mappings);
+    }
+
+    private void RebuildRuntime()
+    {
+        mappingEngine = new MappingEngine(Project.Mappings);
+        compositor = new Compositor(Project, Effects);
+        layoutDirty = true;
     }
 }

@@ -29,29 +29,8 @@ public static class ProjectJson
             ?? throw new InvalidDataException("Project JSON is empty.");
         if (project.SchemaVersion > Project.CurrentSchemaVersion)
             throw new InvalidDataException($"Project schema {project.SchemaVersion} is newer than supported {Project.CurrentSchemaVersion}.");
-        Validate(project);
+        project.ValidateIntegrity();
         return project;
-    }
-
-    private static void Validate(Project project)
-    {
-        var zoneIds = new HashSet<string>();
-        foreach (var z in project.Zones)
-        {
-            if (string.IsNullOrWhiteSpace(z.Id)) throw new InvalidDataException("A zone has no id.");
-            if (!zoneIds.Add(z.Id)) throw new InvalidDataException($"Duplicate zone id '{z.Id}'.");
-        }
-        var groupIds = new HashSet<string>();
-        foreach (var g in project.Groups)
-        {
-            if (string.IsNullOrWhiteSpace(g.Id)) throw new InvalidDataException("A group has no id.");
-            if (!groupIds.Add(g.Id)) throw new InvalidDataException($"Duplicate group id '{g.Id}'.");
-        }
-        foreach (var m in project.Mappings)
-        {
-            bool known = m.Target.Kind == Engine.Mappings.TargetKind.Zone ? zoneIds.Contains(m.Target.Id) : groupIds.Contains(m.Target.Id);
-            if (!known) throw new InvalidDataException($"Mapping '{m.Id}' targets unknown {m.Target}.");
-        }
     }
 
     /// <summary>Serializes only non-default parameters as {"hue": 0.5}. Raw units.</summary>

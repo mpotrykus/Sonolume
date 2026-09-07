@@ -51,6 +51,27 @@ public class EngineRunnerTests
     }
 
     [Fact]
+    public void VoidInvoke_RunsOnEngineThread()
+    {
+        var sink = new RecordingSink();
+        using var runner = new EngineRunner(new Engine(Project.CreateDefault()), sink);
+        runner.Start();
+        runner.Invoke(e => e.RenameProject("Renamed"));
+        Assert.Equal("Renamed", runner.Invoke(e => e.Project.Name));
+    }
+
+    [Fact]
+    public void Invoke_PropagatesOriginalExceptionUnwrapped()
+    {
+        var sink = new RecordingSink();
+        using var runner = new EngineRunner(new Engine(Project.CreateDefault()), sink);
+        runner.Start();
+
+        var ex = Assert.Throws<InvalidDataException>(() => runner.Invoke(e => e.AddZone(new Zone { Id = "kick" })));
+        Assert.Contains("kick", ex.Message);
+    }
+
+    [Fact]
     public void RingBuffer_IsFifoAndReportsFull()
     {
         var ring = new MidiRingBuffer(4);

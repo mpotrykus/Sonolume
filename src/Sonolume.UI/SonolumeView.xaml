@@ -17,7 +17,8 @@
         <DockPanel Grid.Row="0" LastChildFill="True">
             <TextBlock Text="Sonolume" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
             <TextBlock x:Name="ProjectNameText" Margin="10,0,0,0" VerticalAlignment="Center" Foreground="#9A9AA3" />
-            <TextBlock x:Name="StatusText" DockPanel.Dock="Right" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="#9A9AA3" TextAlignment="Right" />
+            <Button DockPanel.Dock="Right" Content="Edit Zones..." Padding="10,3" Margin="10,0,0,0" Click="EditZones_Click" />
+            <TextBlock x:Name="StatusText" DockPanel.Dock="Right" HorizontalAlignment="Right" VerticalAlignment="Center" Foreground="#9A9AA3" TextAlignment="Right" Margin="0,0,10,0" />
         </DockPanel>
 
         <local:PreviewControl x:Name="Preview" Grid.Row="1" Margin="0,10,0,10" />

@@ -1,7 +1,5 @@
-using System.IO;
 using System.Windows;
 using System.Windows.Controls;
-using Microsoft.Win32;
 using Sonolume.UI;
 
 namespace Sonolume.Standalone;
@@ -49,31 +47,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void Open_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new OpenFileDialog { Filter = "Sonolume project (*.sonolume.json)|*.sonolume.json|JSON (*.json)|*.json|All files|*.*" };
-        if (dialog.ShowDialog(this) != true) return;
-        try
-        {
-            session.ImportProjectJson(File.ReadAllText(dialog.FileName));
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "Open project", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
+    private void Open_Click(object sender, RoutedEventArgs e) => ProjectFileDialogs.Open(this, session);
 
-    private void Save_Click(object sender, RoutedEventArgs e)
-    {
-        var dialog = new SaveFileDialog { Filter = "Sonolume project (*.sonolume.json)|*.sonolume.json", FileName = "project.sonolume.json" };
-        if (dialog.ShowDialog(this) != true) return;
-        try
-        {
-            File.WriteAllText(dialog.FileName, session.ExportProjectJson());
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, ex.Message, "Save project", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
+    private void Save_Click(object sender, RoutedEventArgs e) => ProjectFileDialogs.SaveAs(this, session);
 }
