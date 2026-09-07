@@ -4,7 +4,7 @@
         Title="Sonolume" Width="1180" Height="720" MinWidth="860" MinHeight="620"
         Background="#1B1B20" Foreground="#E6E6EA" FontFamily="Segoe UI" FontSize="12">
     <DockPanel>
-        <Border DockPanel.Dock="Top" Background="#24242B" Padding="12,8">
+        <Border DockPanel.Dock="Top" Background="Transparent" Padding="12,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />

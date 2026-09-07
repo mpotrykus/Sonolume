@@ -8,6 +8,13 @@
              FontSize="12"
              MinWidth="820" MinHeight="560"
              PreviewKeyDown="SonolumeView_PreviewKeyDown">
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Theme/DarkTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
     <Grid Margin="12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -56,8 +63,8 @@
                             <DockPanel LastChildFill="True" Margin="0,0,0,4">
                                 <TextBlock Text="Zones" FontWeight="SemiBold" VerticalAlignment="Center" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                                    <Button Content="+" Width="24" Margin="4,0,0,0" Click="AddZone_Click" />
-                                    <Button Content="-" Width="24" Margin="4,0,0,0" Click="RemoveZone_Click" />
+                                    <Button Content="+" Width="24" Margin="4,0,0,0" Style="{StaticResource IconButtonStyle}" Click="AddZone_Click" />
+                                    <Button Content="-" Width="24" Margin="4,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveZone_Click" />
                                 </StackPanel>
                             </DockPanel>
                             <ListBox x:Name="ZoneList" DisplayMemberPath="Name" MaxHeight="150" Margin="0,0,0,10" SelectionChanged="ZoneList_SelectionChanged" />
@@ -65,8 +72,8 @@
                             <DockPanel LastChildFill="True" Margin="0,0,0,4">
                                 <TextBlock Text="Groups" FontWeight="SemiBold" VerticalAlignment="Center" />
                                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                                    <Button Content="+" Width="24" Margin="4,0,0,0" Click="AddGroup_Click" />
-                                    <Button Content="-" Width="24" Margin="4,0,0,0" Click="RemoveGroup_Click" />
+                                    <Button Content="+" Width="24" Margin="4,0,0,0" Style="{StaticResource IconButtonStyle}" Click="AddGroup_Click" />
+                                    <Button Content="-" Width="24" Margin="4,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveGroup_Click" />
                                 </StackPanel>
                             </DockPanel>
                             <ListBox x:Name="GroupList" DisplayMemberPath="Name" MaxHeight="150" SelectionChanged="GroupList_SelectionChanged" />
