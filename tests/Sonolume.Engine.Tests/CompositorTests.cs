@@ -42,6 +42,73 @@ public class CompositorTests
         Transform = Transform.Identity,
     };
 
+    private static Project MakeOverlapProject(string effectId)
+    {
+        var project = Project.CreateEmpty();
+        var zone = new Zone { Id = "pad", Name = "pad", CellsW = 1, CellsH = 1 };
+        zone.Params[ParamId.Hue] = 0f;
+        zone.Params[ParamId.Saturation] = 1f;
+        zone.Params[ParamId.Brightness] = 0.3f; // leaves headroom below 255 so additive stacking is visible, not clipped
+        zone.Params[ParamId.EffectDecay] = 5f;
+        zone.Params[ParamId.EffectSpeed] = 0.5f;
+        project.Zones.Add(zone);
+        project.Mappings.Add(new Mapping
+        {
+            Id = "m1",
+            Source = SourceAddress.Note(40),
+            Target = TargetRef.Zone("pad"),
+            Param = ParamId.EffectIntensity,
+            Mode = MappingMode.Trigger,
+            EffectId = effectId,
+        });
+        return project;
+    }
+
+    [Fact]
+    public void Pulse_Retriggered_LayersInsteadOfResetting()
+    {
+        var engine = new Engine(MakeOverlapProject("pulse"), instanceId: "overlap0001");
+        engine.Push(MidiEvent.NoteOn(0, 40, 1f, 0));
+        engine.Tick(0f);
+        var single = Color(engine.TakeFrame(full: true)!, "pad");
+
+        engine.Push(MidiEvent.NoteOn(0, 40, 1f, 0)); // second hit while the first is still breathing
+        engine.Tick(0f);
+        var stacked = Color(engine.TakeFrame(full: true)!, "pad");
+
+        Assert.True(stacked.R > single.R, $"expected the second hit to add brightness on top of the first (single={single.R}), got {stacked.R}");
+    }
+
+    [Fact]
+    public void Ripple_Retriggered_LayersInsteadOfResetting()
+    {
+        var engine = new Engine(MakeOverlapProject("ripple"), instanceId: "overlap0002");
+        engine.Push(MidiEvent.NoteOn(0, 40, 1f, 0));
+        engine.Tick(0f);
+        var single = Color(engine.TakeFrame(full: true)!, "pad");
+
+        engine.Push(MidiEvent.NoteOn(0, 40, 1f, 0));
+        engine.Tick(0f);
+        var stacked = Color(engine.TakeFrame(full: true)!, "pad");
+
+        Assert.True(stacked.R > single.R, $"expected the second hit to add brightness on top of the first (single={single.R}), got {stacked.R}");
+    }
+
+    [Fact]
+    public void Flash_Retriggered_ResetsInPlace_DoesNotLayer()
+    {
+        var engine = new Engine(MakeOverlapProject("flash"), instanceId: "overlap0003");
+        engine.Push(MidiEvent.NoteOn(0, 40, 1f, 0));
+        engine.Tick(0f);
+        var single = Color(engine.TakeFrame(full: true)!, "pad");
+
+        engine.Push(MidiEvent.NoteOn(0, 40, 1f, 0));
+        engine.Tick(0f);
+        var retriggered = Color(engine.TakeFrame(full: true)!, "pad");
+
+        Assert.Equal(single, retriggered);
+    }
+
     [Fact]
     public void AdditiveBlend_CombinesActivelyFlashingOverlappingZones()
     {

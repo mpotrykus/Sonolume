@@ -20,6 +20,10 @@ public sealed class SonolumeSession : IDisposable
     /// count as clean).</summary>
     private string savedSnapshot;
 
+    /// <summary>Project state as of the last <see cref="BeginLearn"/>, so <see cref="PollLearn"/> can fold the
+    /// mapping the engine thread adds directly (see <see cref="Engine.Engine.PushControl"/>) into undo history.</summary>
+    private string? learnBeforeSnapshot;
+
     public SonolumeSession(Project? project = null, HttpCanvasSinkOptions? sinkOptions = null)
     {
         InstanceId = Guid.NewGuid().ToString("N")[..8];
@@ -55,7 +59,18 @@ public sealed class SonolumeSession : IDisposable
     /// when there is nothing to write (including after undoing back to that point).</summary>
     public bool HasUnsavedChanges { get; private set; }
 
+    /// <summary>The zone or group currently armed to learn the next MIDI key, if any. UI-thread-only.</summary>
+    public TargetRef? PendingLearnTarget { get; private set; }
+
+    /// <summary>True while the engine is actually waiting on a controller move for <see cref="PendingLearnTarget"/>
+    /// (lags <see cref="PendingLearnTarget"/> slightly, since it comes from the polled engine snapshot).</summary>
+    public bool IsLearning => Runner.LatestSnapshot?.IsLearning ?? false;
+
     public void Enqueue(in MidiEvent e) => Runner.Enqueue(e);
+
+    /// <summary>Reports the host's tempo (the plugin calls this every audio buffer). Never called by the
+    /// standalone app, which has no host and always runs effects free-running off EffectSpeed.</summary>
+    public void SetTempo(double bpm, bool isPlaying) => Runner.SetTempo(bpm, isPlaying);
 
     public string ExportProjectJson() => Runner.Invoke(e => ProjectJson.Serialize(e.Project));
 
@@ -104,6 +119,17 @@ public sealed class SonolumeSession : IDisposable
 
     public void UpdateZone(string id, Action<Zone> apply) => MutateWithUndo(e => e.UpdateZone(id, apply));
 
+    /// <summary>Reassigns ZIndex for every zone so the render order matches <paramref name="orderedIds"/>, which
+    /// runs topmost-first (highest ZIndex first) as shown in the zone list.</summary>
+    public void ReorderZones(IReadOnlyList<string> orderedIds) => MutateWithUndo(e =>
+    {
+        for (int i = 0; i < orderedIds.Count; i++)
+        {
+            int zIndex = orderedIds.Count - 1 - i;
+            e.UpdateZone(orderedIds[i], z => z.ZIndex = zIndex);
+        }
+    });
+
     public void AddGroup(Group group) => MutateWithUndo(e => e.AddGroup(group));
 
     public void RemoveGroup(string id) => MutateWithUndo(e => e.RemoveGroup(id));
@@ -111,6 +137,67 @@ public sealed class SonolumeSession : IDisposable
     public void UpdateGroup(string id, Action<Group> apply) => MutateWithUndo(e => e.UpdateGroup(id, apply));
 
     public void RenameProject(string name) => MutateWithUndo(e => e.RenameProject(name));
+
+    /// <summary>Removes every mapping targeting <paramref name="target"/> (e.g. clearing a zone/group's key).</summary>
+    public void RemoveMappingsForTarget(TargetRef target) => MutateWithUndo(e =>
+    {
+        var ids = e.Project.Mappings.Where(m => m.Target == target).Select(m => m.Id).ToList();
+        foreach (var id in ids) e.RemoveMapping(id);
+    });
+
+    /// <summary>Switches the effect used by <paramref name="target"/>'s Trigger/Gate mapping(s), if any exist
+    /// (Set-mode mappings ignore EffectId and are left alone), and upgrades them to Gate so the effect holds for
+    /// as long as the key is down - covers mappings learned before Gate became the default, and the built-in
+    /// default kit's Trigger mappings. No-op - and no undo entry - if nothing is learned yet (the effect picker's
+    /// selection is then just remembered for the next <see cref="BeginLearn"/>) or if every matching mapping
+    /// already has this EffectId and is already Gate, so the effect picker can call this unconditionally on every
+    /// open without spamming undo history.</summary>
+    public void SetEffect(TargetRef target, string effectId)
+    {
+        var matching = GetProjectCopy().Mappings.Where(m => m.Target == target && m.Mode != MappingMode.Set).ToList();
+        if (matching.Count == 0) return;
+        if (matching.All(m => m.EffectId == effectId && m.Mode == MappingMode.Gate)) return;
+
+        MutateWithUndo(e =>
+        {
+            foreach (var m in e.Project.Mappings)
+            {
+                if (m.Target != target || m.Mode == MappingMode.Set) continue;
+                m.EffectId = effectId;
+                m.Mode = MappingMode.Gate;
+            }
+        });
+    }
+
+    /// <summary>Arms the engine to turn the next matching MIDI event into a mapping targeting
+    /// <paramref name="target"/>. Not undoable itself; <see cref="PollLearn"/> folds the result in once it lands.</summary>
+    public void BeginLearn(TargetRef target, ParamId param, MappingMode mode, string? effectId = null)
+    {
+        PendingLearnTarget = target;
+        learnBeforeSnapshot = ExportProjectJson();
+        Runner.Post(e => e.BeginLearn(new LearnRequest(target, param, mode, effectId)));
+    }
+
+    public void CancelLearn()
+    {
+        Runner.Post(e => e.CancelLearn());
+        PendingLearnTarget = null;
+        learnBeforeSnapshot = null;
+    }
+
+    /// <summary>Call periodically (the editor already polls at a fixed interval). Once a pending learn resolves -
+    /// the engine thread adds the mapping directly, outside <see cref="MutateWithUndo"/> - folds it into undo
+    /// history and unsaved-changes tracking like any other structural edit.</summary>
+    public void PollLearn()
+    {
+        if (PendingLearnTarget is null || IsLearning) return;
+        string before = learnBeforeSnapshot!;
+        learnBeforeSnapshot = null;
+        PendingLearnTarget = null;
+        PushCapped(undoStack, before);
+        redoStack.Clear();
+        HasUnsavedChanges = ExportProjectJson() != savedSnapshot;
+    }
 
     public void Undo()
     {

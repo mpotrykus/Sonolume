@@ -68,6 +68,7 @@ public sealed class SonolumePlugin : AudioPluginWPF
     public override void Process()
     {
         base.Process();
+        session?.SetTempo(Host.BPM, Host.IsPlaying);
         Host.ProcessAllEvents();
         if (output is null) return;
         output.GetAudioBuffer(0).Clear();

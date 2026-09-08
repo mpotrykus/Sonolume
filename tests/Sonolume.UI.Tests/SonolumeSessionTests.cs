@@ -1,3 +1,4 @@
+using Sonolume.Engine.Mappings;
 using Sonolume.Engine.Model;
 using Xunit;
 
@@ -85,6 +86,42 @@ public class SonolumeSessionTests
     {
         using var session = NewSession();
         Assert.Throws<InvalidDataException>(() => session.AddZone(new Zone { Id = "kick" }));
+        Assert.False(session.CanUndo);
+    }
+
+    [Fact]
+    public void SetEffect_UpgradesDefaultKitTriggerMappingToGate()
+    {
+        using var session = NewSession();
+        var kick = session.GetProjectCopy().Mappings.Single(m => m.Target == TargetRef.Zone("kick"));
+        Assert.Equal(MappingMode.Trigger, kick.Mode);
+
+        session.SetEffect(TargetRef.Zone("kick"), "flash");
+
+        var updated = session.GetProjectCopy().Mappings.Single(m => m.Target == TargetRef.Zone("kick"));
+        Assert.Equal(MappingMode.Gate, updated.Mode);
+        Assert.Equal("flash", updated.EffectId);
+    }
+
+    [Fact]
+    public void SetEffect_CalledAgainWithSameValue_DoesNotPushASecondUndoEntry()
+    {
+        using var session = NewSession();
+        session.SetEffect(TargetRef.Zone("kick"), "flash");
+        session.SetEffect(TargetRef.Zone("kick"), "flash"); // already Gate + "flash" - should be a no-op
+
+        session.Undo();
+
+        Assert.False(session.CanUndo); // only one undo entry existed, despite two calls
+        var reverted = session.GetProjectCopy().Mappings.Single(m => m.Target == TargetRef.Zone("kick"));
+        Assert.Equal(MappingMode.Trigger, reverted.Mode);
+    }
+
+    [Fact]
+    public void SetEffect_NoMappingForTarget_IsNoOp()
+    {
+        using var session = NewSession();
+        session.SetEffect(TargetRef.Zone("nonexistent"), "wave");
         Assert.False(session.CanUndo);
     }
 

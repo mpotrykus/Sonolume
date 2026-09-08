@@ -258,6 +258,99 @@ public class EngineTests
     }
 
     [Fact]
+    public void SetTempo_ChangesPulseEffectPhaseFromFreeRunning()
+    {
+        // Wave and Ripple are one-shot (tied to real elapsed time, not a beat grid, like a physical wave/ripple
+        // wouldn't be); Pulse still loops on a tempo-lockable rate, so it's the one that exercises the plumbing.
+        var freeRunning = MakeEffectProject("pulse");
+        var freeEngine = new Engine(freeRunning, instanceId: "pulse0free");
+        freeEngine.Push(MidiEvent.NoteOn(0, 36, 1f, 0));
+        freeEngine.Tick(0.3f);
+        var freeCells = freeEngine.TakeFrame(full: true)!.Regions.Single(r => r.ZoneId == "strip").Cells;
+
+        var synced = MakeEffectProject("pulse");
+        var syncedEngine = new Engine(synced, instanceId: "pulse0sync");
+        syncedEngine.SetTempo(60, isPlaying: true);
+        syncedEngine.Push(MidiEvent.NoteOn(0, 36, 1f, 0));
+        syncedEngine.Tick(0.3f);
+        var syncedCells = syncedEngine.TakeFrame(full: true)!.Regions.Single(r => r.ZoneId == "strip").Cells;
+
+        Assert.False(freeCells.AsSpan().SequenceEqual(syncedCells));
+    }
+
+    [Fact]
+    public void SetTempo_NeverCalled_StandaloneStaysFreeRunning()
+    {
+        var project = MakeEffectProject("pulse");
+        var engine = new Engine(project, instanceId: "pulse0std");
+        engine.Push(MidiEvent.NoteOn(0, 36, 1f, 0));
+        engine.Tick(0.3f);
+        var frame = engine.TakeFrame(full: true)!;
+        Assert.NotNull(frame);
+        // No SetTempo call: bpm defaults to 0, which is "free-running" - this must not throw or hang.
+    }
+
+    [Fact]
+    public void GateMapping_SustainsWhileHeldThenDecaysAfterRelease()
+    {
+        var project = Project.CreateEmpty();
+        var zone = new Zone { Id = "pad", Name = "pad" };
+        zone.Params[ParamId.Hue] = 0f;
+        zone.Params[ParamId.Saturation] = 1f;
+        zone.Params[ParamId.Brightness] = 1f;
+        zone.Params[ParamId.EffectDecay] = 0.05f;
+        project.Zones.Add(zone);
+        project.Mappings.Add(new Mapping
+        {
+            Id = "gate-map",
+            Source = SourceAddress.Note(40),
+            Target = TargetRef.Zone("pad"),
+            Param = ParamId.EffectIntensity,
+            Mode = MappingMode.Gate,
+            EffectId = "flash",
+        });
+
+        var engine = new Engine(project, instanceId: "gate0001");
+        engine.Push(MidiEvent.NoteOn(0, 40, 1f, 0));
+
+        // Held well past what a 0.05s decay would normally allow - must stay lit while the key is down.
+        for (int i = 0; i < 60; i++) engine.Tick(Dt);
+        Assert.Equal(new Rgb8(255, 0, 0), KickColorOf(engine, "pad"));
+
+        engine.Push(MidiEvent.NoteOff(0, 40, 0f, 0));
+        for (int i = 0; i < 60; i++) engine.Tick(Dt);
+        Assert.Equal(Rgb8.Black, KickColorOf(engine, "pad"));
+    }
+
+    private static Rgb8 KickColorOf(Engine engine, string zoneId)
+    {
+        var frame = engine.TakeFrame(full: true)!;
+        return frame.Regions.Single(r => r.ZoneId == zoneId).Cells[0];
+    }
+
+    private static Project MakeEffectProject(string effectId)
+    {
+        var project = Project.CreateEmpty();
+        var zone = new Zone { Id = "strip", Name = "strip", Rect = new RectF(0f, 0f, 1f, 1f), CellsW = 8, CellsH = 1 };
+        zone.Params[ParamId.Hue] = 0f;
+        zone.Params[ParamId.Saturation] = 1f;
+        zone.Params[ParamId.Brightness] = 1f;
+        zone.Params[ParamId.EffectDecay] = 5f;
+        project.Zones.Add(zone);
+        project.Mappings.Add(new Mapping
+        {
+            Id = "effect-map",
+            Source = SourceAddress.Note(36),
+            Target = TargetRef.Zone("strip"),
+            Param = ParamId.EffectIntensity,
+            Mode = MappingMode.Trigger,
+            EffectId = effectId,
+            Transform = Transform.Identity,
+        });
+        return project;
+    }
+
+    [Fact]
     public void RenameProject_UpdatesNameAndMarksLayoutChanged()
     {
         var engine = NewEngine();

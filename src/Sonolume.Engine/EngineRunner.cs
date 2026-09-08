@@ -33,6 +33,8 @@ public sealed class EngineRunner : IDisposable
     private volatile EngineSnapshot? snapshot;
     private long droppedEvents;
     private long processedEvents;
+    private long tempoBpmBits; // BitConverter.DoubleToInt64Bits(bpm), 0 = no host tempo (free-running)
+    private int tempoIsPlaying;
 
     public EngineRunner(Engine engine, IFrameSink sink, EngineRunnerOptions? options = null)
     {
@@ -60,6 +62,16 @@ public sealed class EngineRunner : IDisposable
     {
         if (!queue.TryEnqueue(e)) Interlocked.Increment(ref droppedEvents);
         wake.Set();
+    }
+
+    /// <summary>Reports the host's tempo for the next tick to pick up. Audio-thread safe: no allocation, no locks -
+    /// intended to be called every audio buffer from the plugin's Process(). Not queued through <see cref="wake"/>;
+    /// it's picked up opportunistically on the next scheduled tick, which at typical tick rates is well under the
+    /// audible threshold for a tempo change to take effect.</summary>
+    public void SetTempo(double bpm, bool isPlaying)
+    {
+        Interlocked.Exchange(ref tempoBpmBits, BitConverter.DoubleToInt64Bits(bpm));
+        Interlocked.Exchange(ref tempoIsPlaying, isPlaying ? 1 : 0);
     }
 
     /// <summary>Runs an action on the engine thread. Use for UI edits (parameters, mappings, project load).</summary>
@@ -180,6 +192,7 @@ public sealed class EngineRunner : IDisposable
                 activity = true;
             }
 
+            engine.SetTempo(BitConverter.Int64BitsToDouble(Interlocked.Read(ref tempoBpmBits)), Interlocked.CompareExchange(ref tempoIsPlaying, 0, 0) != 0);
             bool changed = engine.Tick(dt);
 
             if (engine.LayoutChanged || now - lastLayout >= layoutResend)

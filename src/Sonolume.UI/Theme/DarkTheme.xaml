@@ -25,6 +25,8 @@
     <SolidColorBrush x:Key="MutedForegroundBrush" Color="{StaticResource MutedForegroundColor}" />
     <SolidColorBrush x:Key="DisabledForegroundBrush" Color="{StaticResource DisabledForegroundColor}" />
     <SolidColorBrush x:Key="AccentSoftBrush" Color="{StaticResource AccentColor}" Opacity="0.16" />
+    <!-- Matches PreviewControl's KeyLabelBrush (Color.FromArgb(90,255,255,255)) so list rows and the canvas agree. -->
+    <SolidColorBrush x:Key="KeyLabelBrush" Color="#5AFFFFFF" />
 
     <LinearGradientBrush x:Key="PanelBackgroundGradientBrush" StartPoint="0,0" EndPoint="0,1">
         <GradientStop Color="{StaticResource PanelBackgroundTopColor}" Offset="0" />
@@ -88,14 +90,6 @@
         <Setter Property="Width" Value="1" />
         <Setter Property="Background" Value="{StaticResource InputBorderBrush}" />
         <Setter Property="Margin" Value="10,4" />
-    </Style>
-
-    <Style x:Key="StatDividerStyle" TargetType="Border">
-        <Setter Property="Width" Value="1" />
-        <Setter Property="Height" Value="12" />
-        <Setter Property="Background" Value="{StaticResource InputBorderBrush}" />
-        <Setter Property="VerticalAlignment" Value="Center" />
-        <Setter Property="Margin" Value="16,0" />
     </Style>
 
     <!-- Draggable panel dividers -->

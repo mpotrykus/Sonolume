@@ -47,4 +47,29 @@ public class FlashEffectTests
         flash.Trigger(new TriggerInfo(1f, 36, 1f, 0), Params(intensity: 0.5f));
         Assert.Equal(0.5f, flash.Level, 4);
     }
+
+    [Fact]
+    public void Sustain_HoldsLevelUntilRelease()
+    {
+        var flash = new FlashEffect();
+        flash.Trigger(new TriggerInfo(1f, 36, 1f, 0, Sustain: true), Params(decay: 0.05f));
+
+        // Held well past what would normally be a full decay - level must not have moved.
+        for (int i = 0; i < 240; i++) flash.Update(1f / 120f, Params(decay: 0.05f));
+        Assert.Equal(1f, flash.Level, 4);
+        Assert.True(flash.IsActive);
+
+        flash.Release();
+        for (int i = 0; i < 240; i++) flash.Update(1f / 120f, Params(decay: 0.05f));
+        Assert.False(flash.IsActive);
+    }
+
+    [Fact]
+    public void NoSustain_DecaysImmediatelyEvenThoughNeverReleased()
+    {
+        var flash = new FlashEffect();
+        flash.Trigger(new TriggerInfo(1f, 36, 1f, 0, Sustain: false), Params(decay: 0.05f));
+        for (int i = 0; i < 240; i++) flash.Update(1f / 120f, Params(decay: 0.05f));
+        Assert.False(flash.IsActive);
+    }
 }

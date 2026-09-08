@@ -21,7 +21,15 @@ public sealed class EffectRegistry
     public static EffectRegistry CreateDefault()
     {
         var registry = new EffectRegistry();
+        registry.Register(SolidEffect.TypeName, static () => new SolidEffect());
         registry.Register(FlashEffect.TypeName, static () => new FlashEffect());
+        registry.Register(WaveEffect.TypeName, static () => new WaveEffect());
+        registry.Register(PulseEffect.TypeName, static () => new PulseEffect());
+        registry.Register(StrobeEffect.TypeName, static () => new StrobeEffect());
+        registry.Register(ChaseEffect.TypeName, static () => new ChaseEffect());
+        registry.Register(RippleEffect.TypeName, static () => new RippleEffect());
+        registry.Register(SparkleEffect.TypeName, static () => new SparkleEffect());
+        registry.Register(RainbowEffect.TypeName, static () => new RainbowEffect());
         return registry;
     }
 }

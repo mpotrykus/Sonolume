@@ -38,16 +38,10 @@
                          LostFocus="ProjectNameBox_Commit" KeyDown="ProjectNameBox_KeyDown" />
 
                 <Button x:Name="RedoButton" DockPanel.Dock="Right" Margin="6,0,0,0" Click="Redo_Click" ToolTip="Redo">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE7A6;" Style="{StaticResource IconGlyphStyle}" />
-                        <TextBlock Text="Redo" Margin="6,0,0,0" />
-                    </StackPanel>
+                    <TextBlock Text="&#xE7A6;" Style="{StaticResource IconGlyphStyle}" />
                 </Button>
                 <Button x:Name="UndoButton" DockPanel.Dock="Right" Click="Undo_Click" ToolTip="Undo">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE7A7;" Style="{StaticResource IconGlyphStyle}" />
-                        <TextBlock Text="Undo" Margin="6,0,0,0" />
-                    </StackPanel>
+                    <TextBlock Text="&#xE7A7;" Style="{StaticResource IconGlyphStyle}" />
                 </Button>
                 <Border DockPanel.Dock="Right" Style="{StaticResource VerticalDividerStyle}" />
 
@@ -118,7 +112,27 @@
                                     <Button Content="&#xE738;" Margin="6,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveZone_Click" ToolTip="Remove zone" />
                                 </StackPanel>
                             </DockPanel>
-                            <ListBox x:Name="ZoneList" DisplayMemberPath="Name" MaxHeight="150" Margin="0,0,0,20" SelectionChanged="ZoneList_SelectionChanged" />
+                            <ListBox x:Name="ZoneList" MaxHeight="150" Margin="0,0,0,20" SelectionChanged="ZoneList_SelectionChanged"
+                                     AllowDrop="True" PreviewMouseLeftButtonDown="ZoneList_PreviewMouseLeftButtonDown" PreviewMouseMove="ZoneList_PreviewMouseMove"
+                                     DragOver="ZoneList_DragOver" Drop="ZoneList_Drop">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="&#xE700;" FontFamily="{StaticResource IconFontFamily}" FontSize="12"
+                                                       Foreground="{StaticResource MutedForegroundBrush}" Margin="0,0,8,0"
+                                                       VerticalAlignment="Center" Cursor="SizeAll" ToolTip="Drag to reorder" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="2" Text="{Binding KeyLabel}" Foreground="{StaticResource KeyLabelBrush}"
+                                                       Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
 
                             <DockPanel LastChildFill="True" Margin="0,0,0,6">
                                 <TextBlock Text="Groups" Style="{StaticResource SectionHeaderTextStyle}" VerticalAlignment="Center" />
@@ -127,7 +141,21 @@
                                     <Button Content="&#xE738;" Margin="6,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveGroup_Click" ToolTip="Remove group" />
                                 </StackPanel>
                             </DockPanel>
-                            <ListBox x:Name="GroupList" DisplayMemberPath="Name" MaxHeight="150" SelectionChanged="GroupList_SelectionChanged" />
+                            <ListBox x:Name="GroupList" MaxHeight="150" SelectionChanged="GroupList_SelectionChanged">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Grid.Column="1" Text="{Binding KeyLabel}" Foreground="{StaticResource KeyLabelBrush}"
+                                                       Margin="8,0,0,0" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
                         </StackPanel>
 
                         <StackPanel Grid.Column="2">
@@ -147,6 +175,15 @@
                                 <DockPanel Margin="0,0,0,16">
                                     <TextBlock Text="Group" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
                                     <ComboBox x:Name="ZoneGroupCombo" DisplayMemberPath="Name" SelectionChanged="ZoneGroupCombo_SelectionChanged" />
+                                </DockPanel>
+
+                                <DockPanel Margin="0,0,0,16">
+                                    <TextBlock Text="Key" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
+                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                        <Button x:Name="ZoneLearnKeyButton" Content="Learn" Padding="10,2" Click="LearnKeyButton_Click" />
+                                        <Button x:Name="ZoneClearKeyButton" Content="Clear" Padding="10,2" Margin="6,0,0,0" Click="ClearKeyButton_Click" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="ZoneKeyText" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource KeyLabelBrush}" />
                                 </DockPanel>
 
                                 <Grid Margin="0,0,0,8">
@@ -198,9 +235,18 @@
                                     <TextBox x:Name="GroupNameBox" LostFocus="GroupField_Commit" KeyDown="GroupField_KeyDown" />
                                 </DockPanel>
 
-                                <DockPanel>
+                                <DockPanel Margin="0,0,0,16">
                                     <TextBlock Text="Parent" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
                                     <ComboBox x:Name="GroupParentCombo" DisplayMemberPath="Name" SelectionChanged="GroupParentCombo_SelectionChanged" />
+                                </DockPanel>
+
+                                <DockPanel>
+                                    <TextBlock Text="Key" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
+                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                        <Button x:Name="GroupLearnKeyButton" Content="Learn" Padding="10,2" Click="LearnKeyButton_Click" />
+                                        <Button x:Name="GroupClearKeyButton" Content="Clear" Padding="10,2" Margin="6,0,0,0" Click="ClearKeyButton_Click" />
+                                    </StackPanel>
+                                    <TextBlock x:Name="GroupKeyText" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource KeyLabelBrush}" />
                                 </DockPanel>
                             </StackPanel>
 
@@ -232,9 +278,11 @@
             <Border Style="{StaticResource HorizontalDividerStyle}" Margin="0,0,0,12" />
             <DockPanel LastChildFill="False">
                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                    <TextBlock x:Name="MidiText" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="MIDI: 0 events" />
-                    <Border Style="{StaticResource StatDividerStyle}" />
-                    <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock x:Name="MidiText" Width="170" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                               Style="{StaticResource CaptionTextStyle}" Text="MIDI: 0 events" />
+                    <TextBlock Text="|" VerticalAlignment="Center" Margin="16,0" Style="{StaticResource CaptionTextStyle}" />
+                    <TextBlock x:Name="StatusText" Width="320" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                               Style="{StaticResource CaptionTextStyle}" />
                 </StackPanel>
             </DockPanel>
         </StackPanel>

@@ -20,6 +20,8 @@ public sealed class Engine
     private bool layoutDirty = true;
     private LearnRequest? learn;
     private int learnCounter;
+    private double tempoBpm;
+    private bool tempoIsPlaying;
 
     public Engine(Project project, EffectRegistry? effects = null, string? instanceId = null)
     {
@@ -130,12 +132,21 @@ public sealed class Engine
     {
         string effectId = m.EffectId ?? FlashEffect.TypeName;
         if (!Effects.Contains(effectId)) effectId = FlashEffect.TypeName;
-        var info = new TriggerInfo(action.Value01, action.Event.Source.Number, action.Event.Value01, action.Event.TimestampTicks);
+        var info = new TriggerInfo(action.Value01, action.Event.Source.Number, action.Event.Value01, action.Event.TimestampTicks, Sustain: m.Mode == MappingMode.Gate);
         compositor.Trigger(m.Target, effectId, info);
     }
 
+    /// <summary>Reports the host's current tempo, if any, for tempo-locked effects. Call every tick (or every audio
+    /// buffer, via <see cref="EngineRunner.SetTempo"/>); <paramref name="bpm"/> of 0 or less means "no host tempo" -
+    /// effects fall back to running free off EffectSpeed, which is always the case in the standalone app.</summary>
+    public void SetTempo(double bpm, bool isPlaying)
+    {
+        tempoBpm = bpm;
+        tempoIsPlaying = isPlaying;
+    }
+
     /// <summary>Advances time. Returns true when any zone changed since the last <see cref="TakeFrame"/>.</summary>
-    public bool Tick(float dt) => compositor.Update(dt);
+    public bool Tick(float dt) => compositor.Update(dt, tempoBpm, tempoIsPlaying);
 
     public Layout GetLayout()
     {

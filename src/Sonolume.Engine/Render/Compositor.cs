@@ -6,7 +6,7 @@ using Sonolume.Engine.Model;
 
 namespace Sonolume.Engine.Render;
 
-/// <summary>Per-zone runtime state: group chain, running effect, current and last-sent cells.</summary>
+/// <summary>Per-zone runtime state: group chain, running effect instance(s), current and last-sent cells.</summary>
 internal sealed class ZoneRuntime
 {
     public ZoneRuntime(Zone zone, int index, Group[] groupChain)
@@ -17,6 +17,7 @@ internal sealed class ZoneRuntime
         int count = Math.Max(1, zone.CellsW) * Math.Max(1, zone.CellsH);
         Cells = new Rgb8[count];
         LastSent = new Rgb8[count];
+        Scratch = new Rgb8[count];
         Array.Fill(LastSent, new Rgb8(1, 1, 1));
     }
 
@@ -24,9 +25,15 @@ internal sealed class ZoneRuntime
     public int Index { get; }
     /// <summary>Nearest group first.</summary>
     public Group[] GroupChain { get; }
-    public IEffect? Effect { get; set; }
+    /// <summary>Every currently-running effect instance for this zone. Usually at most one; an effect that opts
+    /// into <see cref="IEffect.AllowsOverlap"/> (Pulse, Ripple) gets a fresh instance per trigger instead of being
+    /// reset, so repeated hits layer additively (see <see cref="Compositor.Update"/>) rather than cancel each other.</summary>
+    public List<IEffect> Effects { get; } = new();
     public Rgb8[] Cells { get; }
     public Rgb8[] LastSent { get; }
+    /// <summary>Reused to render each overlapping effect instance beyond the first, so instances don't overwrite
+    /// each other's output in <see cref="Cells"/> before they can be blended together.</summary>
+    public Rgb8[] Scratch { get; }
     public bool Dirty { get; set; }
     /// <summary>True when a Trigger/Gate mapping targets this zone (or a group above it): idle is dark, effects light it up.</summary>
     public bool IsEventDriven { get; set; }
@@ -43,7 +50,7 @@ internal sealed class ZoneRuntime
     }
 
     /// <summary>Group composition: brightness, saturation, intensity multiply; hue adds; active ANDs.</summary>
-    public ResolvedParams Resolve()
+    public ResolvedParams Resolve(float beatsPerSecond = 0f, double songBeats = 0.0, bool tempoSynced = false)
     {
         var p = Zone.Params;
         float brightness = p[ParamId.Brightness];
@@ -72,7 +79,31 @@ internal sealed class ZoneRuntime
             p[ParamId.EffectDecay],
             p[ParamId.PosX],
             p[ParamId.PosY],
-            p[ParamId.PaletteIndex]);
+            p[ParamId.PaletteIndex],
+            beatsPerSecond,
+            songBeats,
+            tempoSynced);
+    }
+
+    /// <summary>Starts <paramref name="effectId"/>: reuses (resets) an existing instance of the same type unless
+    /// it allows overlap, in which case a fresh instance is layered on top of whatever's already running.</summary>
+    public void Trigger(EffectRegistry registry, string effectId, in TriggerInfo info, in ResolvedParams p)
+    {
+        var existing = Effects.FirstOrDefault(e => string.Equals(e.TypeId, effectId, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null && !existing.AllowsOverlap)
+        {
+            existing.Trigger(info, p);
+            return;
+        }
+
+        var created = registry.Create(effectId);
+        created.Trigger(info, p);
+        Effects.Add(created);
+    }
+
+    public void Release()
+    {
+        foreach (var e in Effects) e.Release();
     }
 }
 
@@ -83,6 +114,9 @@ public sealed class Compositor
     private readonly EffectRegistry effects;
     private readonly ZoneRuntime[] zones;
     private readonly Dictionary<string, Group> groupsById;
+    /// <summary>Elapsed beats since the host started transport; frozen while stopped, unused when free-running.
+    /// Effects read this (not their own elapsed time) so tempo-synced zones stay in phase with each other.</summary>
+    private double songBeats;
 
     public Compositor(Project project, EffectRegistry effects)
     {
@@ -116,9 +150,7 @@ public sealed class Compositor
         foreach (var z in zones)
         {
             if (!z.IsTargetedBy(target)) continue;
-            if (z.Effect is null || !string.Equals(z.Effect.TypeId, effectId, StringComparison.OrdinalIgnoreCase))
-                z.Effect = effects.Create(effectId);
-            z.Effect.Trigger(info, z.Resolve());
+            z.Trigger(effects, effectId, info, z.Resolve());
             z.Dirty = true;
         }
     }
@@ -126,7 +158,7 @@ public sealed class Compositor
     public void Release(TargetRef target)
     {
         foreach (var z in zones)
-            if (z.IsTargetedBy(target)) z.Effect?.Release();
+            if (z.IsTargetedBy(target)) z.Release();
     }
 
     public void SetParamNormalized(TargetRef target, ParamId id, float x01) =>
@@ -145,25 +177,41 @@ public sealed class Compositor
         }
     }
 
-    /// <summary>Advances effects and re-renders every zone. Returns true when any zone differs from what was last collected.</summary>
-    public bool Update(float dt)
+    /// <summary>Advances effects and re-renders every zone. Returns true when any zone differs from what was last collected.
+    /// <paramref name="bpm"/> is the host's tempo (0 when there is none - the standalone app always runs free-running);
+    /// <paramref name="isPlaying"/> gates whether <see cref="songBeats"/> advances, so tempo-locked effects freeze
+    /// with the timeline instead of drifting while the host is stopped.</summary>
+    public bool Update(float dt, double bpm = 0.0, bool isPlaying = false)
     {
+        bool tempoSynced = bpm > 0.0;
+        float beatsPerSecond = tempoSynced ? (float)(bpm / 60.0) : 0f;
+        if (tempoSynced && isPlaying) songBeats += dt * beatsPerSecond;
+
         foreach (var z in zones)
         {
-            var p = z.Resolve();
+            var p = z.Resolve(beatsPerSecond, songBeats, tempoSynced);
             Span<Rgb8> cells = z.Cells;
 
-            if (z.Effect is { IsActive: true } effect)
+            for (int i = z.Effects.Count - 1; i >= 0; i--)
             {
-                effect.Update(dt, p);
-                if (effect.IsActive)
-                    effect.Render(cells, z.CellsW, z.CellsH, p);
-                else
-                    RenderIdle(z, cells, p);
+                z.Effects[i].Update(dt, p);
+                if (!z.Effects[i].IsActive) z.Effects.RemoveAt(i);
+            }
+
+            if (z.Effects.Count == 0)
+            {
+                RenderIdle(z, cells, p);
             }
             else
             {
-                RenderIdle(z, cells, p);
+                z.Effects[0].Render(cells, z.CellsW, z.CellsH, p);
+                for (int i = 1; i < z.Effects.Count; i++)
+                {
+                    Span<Rgb8> scratch = z.Scratch;
+                    z.Effects[i].Render(scratch, z.CellsW, z.CellsH, p);
+                    for (int c = 0; c < cells.Length; c++)
+                        cells[c] = Rgb8.Blend(BlendMode.Additive, scratch[c], cells[c]);
+                }
             }
         }
 
