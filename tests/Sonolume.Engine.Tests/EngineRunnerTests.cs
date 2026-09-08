@@ -1,4 +1,6 @@
+using Sonolume.Engine.Core;
 using Sonolume.Engine.Input;
+using Sonolume.Engine.Mappings;
 using Sonolume.Engine.Model;
 using Sonolume.Engine.Output;
 using Xunit;
@@ -7,11 +9,32 @@ namespace Sonolume.Engine.Tests;
 
 public class EngineRunnerTests
 {
+    private static Project MakeFlashProject()
+    {
+        var project = Project.CreateEmpty();
+        var zone = new Zone { Id = "pad", Name = "pad" };
+        zone.Params[ParamId.Hue] = 0f;
+        zone.Params[ParamId.Saturation] = 1f;
+        zone.Params[ParamId.Brightness] = 1f;
+        zone.Params[ParamId.EffectDecay] = 0.25f;
+        project.Zones.Add(zone);
+        project.Mappings.Add(new Mapping
+        {
+            Id = "flash-map",
+            Source = SourceAddress.Note(36),
+            Target = TargetRef.Zone("pad"),
+            Param = ParamId.EffectIntensity,
+            Mode = MappingMode.Trigger,
+            EffectId = "flash",
+        });
+        return project;
+    }
+
     [Fact]
     public async Task SingleHit_ProducesDecayFramesThenOnlyHeartbeats()
     {
         var sink = new RecordingSink();
-        var engine = new Engine(Project.CreateDefault(), instanceId: "runner01");
+        var engine = new Engine(MakeFlashProject(), instanceId: "runner01");
         using var runner = new EngineRunner(engine, sink, new EngineRunnerOptions(TickHz: 120, HeartbeatSeconds: 0.5));
         runner.Start();
 

@@ -9,7 +9,7 @@ namespace Sonolume.Engine.Tests;
 public class MappingTests
 {
     [Fact]
-    public void DefaultProject_Note36_ResolvesToKickFlash()
+    public void DefaultProject_Note36_ResolvesToKickSolid()
     {
         var project = Project.CreateDefault();
         var engine = new MappingEngine(project.Mappings);
@@ -21,7 +21,7 @@ public class MappingTests
         Assert.Equal(1, n);
         Assert.Equal("kick", actions[0].Mapping.Target.Id);
         Assert.Equal(MappingMode.Trigger, actions[0].Mapping.Mode);
-        Assert.Equal("flash", actions[0].Mapping.EffectId);
+        Assert.Equal("solid", actions[0].Mapping.EffectId);
         Assert.Equal(0.75f, actions[0].Value01, 4);
     }
 

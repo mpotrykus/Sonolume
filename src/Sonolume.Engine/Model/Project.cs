@@ -136,7 +136,8 @@ public sealed class Project
 
     public static Project CreateEmpty(string name = "Untitled") => new() { Name = name };
 
-    /// <summary>The vertical-slice default: a drum kit of flash zones. C1 (note 36) is the kick.</summary>
+    /// <summary>The vertical-slice default: a drum kit of solid-lit zones. C1 (note 36) is the kick;
+    /// note 49 (crash) triggers the whole Drums group.</summary>
     public static Project CreateDefault()
     {
         var project = new Project { Name = "Default Kit" };
@@ -147,9 +148,10 @@ public sealed class Project
         project.Zones.Add(MakeZone("snare", "Snare", new RectF(0.36f, 0.56f, 0.28f, 0.38f), hue: 0.62f, groupId: "drums"));
         project.Zones.Add(MakeZone("hihat", "Hi-Hat", new RectF(0.68f, 0.56f, 0.28f, 0.38f), hue: 0.15f, groupId: "drums"));
 
-        project.Mappings.Add(FlashMapping("map-kick", 36, "kick"));
-        project.Mappings.Add(FlashMapping("map-snare", 38, "snare"));
-        project.Mappings.Add(FlashMapping("map-hihat", 42, "hihat"));
+        project.Mappings.Add(TriggerMapping("map-kick", 36, TargetRef.Zone("kick")));
+        project.Mappings.Add(TriggerMapping("map-snare", 38, TargetRef.Zone("snare")));
+        project.Mappings.Add(TriggerMapping("map-hihat", 42, TargetRef.Zone("hihat")));
+        project.Mappings.Add(TriggerMapping("map-drums", 49, TargetRef.Group("drums")));
 
         return project;
     }
@@ -164,14 +166,14 @@ public sealed class Project
         return zone;
     }
 
-    private static Mapping FlashMapping(string id, int note, string zoneId) => new()
+    private static Mapping TriggerMapping(string id, int note, TargetRef target) => new()
     {
         Id = id,
         Source = SourceAddress.Note(note),
-        Target = TargetRef.Zone(zoneId),
+        Target = target,
         Param = ParamId.EffectIntensity,
         Mode = MappingMode.Trigger,
-        EffectId = FlashEffect.TypeName,
+        EffectId = SolidEffect.TypeName,
         Transform = Transform.Identity,
     };
 }

@@ -77,197 +77,195 @@
 
         <Grid Grid.Row="1" Margin="0,20,0,0">
             <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="240" MinWidth="180" MaxWidth="400" />
+                <ColumnDefinition Width="16" />
                 <ColumnDefinition Width="*" MinWidth="360" />
                 <ColumnDefinition Width="16" />
                 <ColumnDefinition Width="300" MinWidth="220" MaxWidth="600" />
             </Grid.ColumnDefinitions>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="*" MinHeight="200" />
-                <RowDefinition Height="16" />
-                <RowDefinition Height="240" MinHeight="120" MaxHeight="500" />
-            </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource PanelBorderStyle}" Padding="6">
-                <local:PreviewControl x:Name="Preview" />
-            </Border>
-
-            <GridSplitter Grid.Row="1" Grid.Column="0" Style="{StaticResource RowSplitterStyle}" />
-            <GridSplitter Grid.Row="0" Grid.RowSpan="3" Grid.Column="1" Style="{StaticResource ColumnSplitterStyle}" />
-
-            <!-- Bottom menu: zones/groups list (left) and the selected item's Name/Group/Rect/Cell grid (right) -->
-            <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource PanelBorderStyle}">
+            <!-- Left column: zones/groups list -->
+            <Border Grid.Column="0" Style="{StaticResource PanelBorderStyle}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <Grid Margin="16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="220" />
-                            <ColumnDefinition Width="20" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0">
-                            <DockPanel LastChildFill="True" Margin="0,0,0,6">
-                                <TextBlock Text="Zones" Style="{StaticResource SectionHeaderTextStyle}" VerticalAlignment="Center" />
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                                    <Button Content="&#xE710;" Style="{StaticResource IconButtonStyle}" Click="AddZone_Click" ToolTip="Add zone" />
-                                    <Button Content="&#xE738;" Margin="6,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveZone_Click" ToolTip="Remove zone" />
-                                </StackPanel>
-                            </DockPanel>
-                            <ListBox x:Name="ZoneList" MaxHeight="150" Margin="0,0,0,20" SelectionChanged="ZoneList_SelectionChanged"
-                                     AllowDrop="True" PreviewMouseLeftButtonDown="ZoneList_PreviewMouseLeftButtonDown" PreviewMouseMove="ZoneList_PreviewMouseMove"
-                                     DragOver="ZoneList_DragOver" Drop="ZoneList_Drop">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="&#xE700;" FontFamily="{StaticResource IconFontFamily}" FontSize="12"
-                                                       Foreground="{StaticResource MutedForegroundBrush}" Margin="0,0,8,0"
-                                                       VerticalAlignment="Center" Cursor="SizeAll" ToolTip="Drag to reorder" />
-                                            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Grid.Column="2" Text="{Binding KeyLabel}" Foreground="{StaticResource KeyLabelBrush}"
-                                                       Margin="8,0,0,0" VerticalAlignment="Center" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-
-                            <DockPanel LastChildFill="True" Margin="0,0,0,6">
-                                <TextBlock Text="Groups" Style="{StaticResource SectionHeaderTextStyle}" VerticalAlignment="Center" />
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
-                                    <Button Content="&#xE710;" Style="{StaticResource IconButtonStyle}" Click="AddGroup_Click" ToolTip="Add group" />
-                                    <Button Content="&#xE738;" Margin="6,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveGroup_Click" ToolTip="Remove group" />
-                                </StackPanel>
-                            </DockPanel>
-                            <ListBox x:Name="GroupList" MaxHeight="150" SelectionChanged="GroupList_SelectionChanged">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Grid.Column="1" Text="{Binding KeyLabel}" Foreground="{StaticResource KeyLabelBrush}"
-                                                       Margin="8,0,0,0" VerticalAlignment="Center" />
-                                        </Grid>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="2">
-                            <StackPanel x:Name="ZoneFieldsPanel" Visibility="Collapsed">
-                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
-                                    <ToggleButton x:Name="ZoneInvertXToggle" Content="&#x21C4;" Style="{StaticResource ToggleIconButtonStyle}"
-                                                  ToolTip="Invert X Axis" Checked="ZoneInvertToggle_Changed" Unchecked="ZoneInvertToggle_Changed" />
-                                    <ToggleButton x:Name="ZoneInvertYToggle" Content="&#x21C5;" Style="{StaticResource ToggleIconButtonStyle}" Margin="6,0,0,0"
-                                                  ToolTip="Invert Y Axis" Checked="ZoneInvertToggle_Changed" Unchecked="ZoneInvertToggle_Changed" />
-                                </StackPanel>
-
-                                <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="Name" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
-                                    <TextBox x:Name="ZoneNameBox" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                </DockPanel>
-
-                                <DockPanel Margin="0,0,0,16">
-                                    <TextBlock Text="Group" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
-                                    <ComboBox x:Name="ZoneGroupCombo" DisplayMemberPath="Name" SelectionChanged="ZoneGroupCombo_SelectionChanged" />
-                                </DockPanel>
-
-                                <DockPanel Margin="0,0,0,16">
-                                    <TextBlock Text="Key" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
-                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                                        <Button x:Name="ZoneLearnKeyButton" Content="Learn" Padding="10,2" Click="LearnKeyButton_Click" />
-                                        <Button x:Name="ZoneClearKeyButton" Content="Clear" Padding="10,2" Margin="6,0,0,0" Click="ClearKeyButton_Click" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="ZoneKeyText" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource KeyLabelBrush}" />
-                                </DockPanel>
-
-                                <Grid Margin="0,0,0,8">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="72" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="70" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="16" />
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="70" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-
-                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Position" Style="{StaticResource FieldLabelTextStyle}" />
-                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="x" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                                    <TextBox x:Name="ZoneXBox" Grid.Row="0" Grid.Column="2" ToolTip="X" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                    <TextBlock Grid.Row="0" Grid.Column="3" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,0,0,0" />
-                                    <TextBlock Grid.Row="0" Grid.Column="5" Text="y" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                                    <TextBox x:Name="ZoneYBox" Grid.Row="0" Grid.Column="6" ToolTip="Y" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                    <TextBlock Grid.Row="0" Grid.Column="7" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,0,0,0" />
-
-                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Size" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
-                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="w" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
-                                    <TextBox x:Name="ZoneWBox" Grid.Row="1" Grid.Column="2" ToolTip="W" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                    <TextBlock Grid.Row="1" Grid.Column="3" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
-                                    <TextBlock Grid.Row="1" Grid.Column="5" Text="h" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
-                                    <TextBox x:Name="ZoneHBox" Grid.Row="1" Grid.Column="6" ToolTip="H" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                    <TextBlock Grid.Row="1" Grid.Column="7" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
-
-                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Grid" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="x" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
-                                    <TextBox x:Name="ZoneCellsWBox" Grid.Row="2" Grid.Column="2" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                    <TextBlock Grid.Row="2" Grid.Column="5" Text="y" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
-                                    <TextBox x:Name="ZoneCellsHBox" Grid.Row="2" Grid.Column="6" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                </Grid>
+                    <StackPanel Margin="16">
+                        <DockPanel LastChildFill="True" Margin="0,0,0,6">
+                            <TextBlock Text="Zones" Style="{StaticResource SectionHeaderTextStyle}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                                <Button Content="&#xE710;" Style="{StaticResource IconButtonStyle}" Click="AddZone_Click" ToolTip="Add zone" />
+                                <Button Content="&#xE738;" Margin="6,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveZone_Click" ToolTip="Remove zone" />
                             </StackPanel>
+                        </DockPanel>
+                        <ListBox x:Name="ZoneList" MaxHeight="240" Margin="0,0,0,20" SelectionChanged="ZoneList_SelectionChanged"
+                                 AllowDrop="True" PreviewMouseLeftButtonDown="ZoneList_PreviewMouseLeftButtonDown" PreviewMouseMove="ZoneList_PreviewMouseMove"
+                                 DragOver="ZoneList_DragOver" Drop="ZoneList_Drop">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="&#xE700;" FontFamily="{StaticResource IconFontFamily}" FontSize="12"
+                                                   Foreground="{StaticResource MutedForegroundBrush}" Margin="0,0,8,0"
+                                                   VerticalAlignment="Center" Cursor="SizeAll" ToolTip="Drag to reorder" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" Text="{Binding KeyLabel}" Foreground="{StaticResource KeyLabelBrush}"
+                                                   Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
 
-                            <StackPanel x:Name="GroupFieldsPanel" Visibility="Collapsed">
-                                <TextBlock Text="Group" Style="{StaticResource PanelHeaderTextStyle}" />
-
-                                <DockPanel Margin="0,0,0,8">
-                                    <TextBlock Text="Name" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
-                                    <TextBox x:Name="GroupNameBox" LostFocus="GroupField_Commit" KeyDown="GroupField_KeyDown" />
-                                </DockPanel>
-
-                                <DockPanel Margin="0,0,0,16">
-                                    <TextBlock Text="Parent" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
-                                    <ComboBox x:Name="GroupParentCombo" DisplayMemberPath="Name" SelectionChanged="GroupParentCombo_SelectionChanged" />
-                                </DockPanel>
-
-                                <DockPanel>
-                                    <TextBlock Text="Key" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
-                                    <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
-                                        <Button x:Name="GroupLearnKeyButton" Content="Learn" Padding="10,2" Click="LearnKeyButton_Click" />
-                                        <Button x:Name="GroupClearKeyButton" Content="Clear" Padding="10,2" Margin="6,0,0,0" Click="ClearKeyButton_Click" />
-                                    </StackPanel>
-                                    <TextBlock x:Name="GroupKeyText" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource KeyLabelBrush}" />
-                                </DockPanel>
+                        <DockPanel LastChildFill="True" Margin="0,0,0,6">
+                            <TextBlock Text="Groups" Style="{StaticResource SectionHeaderTextStyle}" VerticalAlignment="Center" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" DockPanel.Dock="Right">
+                                <Button Content="&#xE710;" Style="{StaticResource IconButtonStyle}" Click="AddGroup_Click" ToolTip="Add group" />
+                                <Button Content="&#xE738;" Margin="6,0,0,0" Style="{StaticResource IconButtonStyle}" Click="RemoveGroup_Click" ToolTip="Remove group" />
                             </StackPanel>
-
-                            <StackPanel x:Name="EmptyFieldsPanel">
-                                <TextBlock Text="Select a zone or group to edit, or add a new one." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
-                                <TextBlock Text="Tip: you can also drag a zone to move it, or drag its handles to resize it, directly on the live preview." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,8,0,0" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Grid>
+                        </DockPanel>
+                        <ListBox x:Name="GroupList" MaxHeight="240" SelectionChanged="GroupList_SelectionChanged">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="1" Text="{Binding KeyLabel}" Foreground="{StaticResource KeyLabelBrush}"
+                                                   Margin="8,0,0,0" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+                    </StackPanel>
                 </ScrollViewer>
             </Border>
 
-            <!-- Right menu: all params for the selected zone/group -->
-            <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="2" Style="{StaticResource PanelBorderStyle}">
+            <GridSplitter Grid.Column="1" Style="{StaticResource ColumnSplitterStyle}" />
+
+            <Border Grid.Column="2" Style="{StaticResource PanelBorderStyle}" Padding="6">
+                <local:PreviewControl x:Name="Preview" />
+            </Border>
+
+            <GridSplitter Grid.Column="3" Style="{StaticResource ColumnSplitterStyle}" />
+
+            <!-- Right menu: identity/geometry fields and all params for the selected zone/group -->
+            <Border Grid.Column="4" Style="{StaticResource PanelBorderStyle}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
-                        <DockPanel LastChildFill="False">
+                        <StackPanel x:Name="EmptyFieldsPanel">
+                            <TextBlock Text="Select a zone or group to edit, or add a new one." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
+                            <TextBlock Text="Tip: you can also drag a zone to move it, or drag its handles to resize it, directly on the live preview." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                        </StackPanel>
+
+                        <DockPanel LastChildFill="False" Margin="0,0,0,16">
                             <TextBlock x:Name="ParamsTitle" Text="Params" Style="{StaticResource PanelHeaderTextStyle}" DockPanel.Dock="Left" Visibility="Collapsed" />
                             <CheckBox x:Name="ParamsActiveCheckBox" Content="Active" DockPanel.Dock="Right" VerticalAlignment="Center" Visibility="Collapsed" />
                         </DockPanel>
-                        <TextBlock x:Name="ParamsEmptyText" Text="Select a zone or group to edit its parameters." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
+
+                        <StackPanel x:Name="ZoneIdentityPanel" Visibility="Collapsed">
+                            <DockPanel Margin="0,0,0,8">
+                                <TextBlock Text="Name" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
+                                <TextBox x:Name="ZoneNameBox" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                            </DockPanel>
+
+                            <DockPanel Margin="0,0,0,8">
+                                <TextBlock Text="Group" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
+                                <ComboBox x:Name="ZoneGroupCombo" DisplayMemberPath="Name" SelectionChanged="ZoneGroupCombo_SelectionChanged" />
+                            </DockPanel>
+
+                            <DockPanel Margin="0,0,0,16">
+                                <TextBlock Text="Key" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                    <Button x:Name="ZoneLearnKeyButton" Content="Learn" Padding="10,2" Click="LearnKeyButton_Click" />
+                                    <Button x:Name="ZoneClearKeyButton" Content="Clear" Padding="10,2" Margin="6,0,0,0" Click="ClearKeyButton_Click" />
+                                </StackPanel>
+                                <TextBlock x:Name="ZoneKeyText" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource KeyLabelBrush}" />
+                            </DockPanel>
+                        </StackPanel>
+
+                        <StackPanel x:Name="GroupIdentityPanel" Visibility="Collapsed">
+                            <DockPanel Margin="0,0,0,8">
+                                <TextBlock Text="Name" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
+                                <TextBox x:Name="GroupNameBox" LostFocus="GroupField_Commit" KeyDown="GroupField_KeyDown" />
+                            </DockPanel>
+
+                            <DockPanel Margin="0,0,0,8">
+                                <TextBlock Text="Parent" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
+                                <ComboBox x:Name="GroupParentCombo" DisplayMemberPath="Name" SelectionChanged="GroupParentCombo_SelectionChanged" />
+                            </DockPanel>
+
+                            <DockPanel Margin="0,0,0,16">
+                                <TextBlock Text="Key" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
+                                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                    <Button x:Name="GroupLearnKeyButton" Content="Learn" Padding="10,2" Click="LearnKeyButton_Click" />
+                                    <Button x:Name="GroupClearKeyButton" Content="Clear" Padding="10,2" Margin="6,0,0,0" Click="ClearKeyButton_Click" />
+                                </StackPanel>
+                                <TextBlock x:Name="GroupKeyText" VerticalAlignment="Center" Margin="8,0,0,0" Foreground="{StaticResource KeyLabelBrush}" />
+                            </DockPanel>
+                        </StackPanel>
+
+                        <Border x:Name="ZoneGeometryBorder" Visibility="Collapsed" Style="{StaticResource GroupBorderStyle}" Margin="0,0,0,12" Padding="12">
+                            <StackPanel>
+                                <DockPanel x:Name="ZoneGeometryHeader" Margin="0,0,0,10" Cursor="Hand" Background="Transparent"
+                                           MouseLeftButtonUp="ZoneGeometryHeader_MouseLeftButtonUp">
+                                    <TextBlock x:Name="ZoneGeometryChevron" Text="&#xE70D;" FontFamily="{StaticResource IconFontFamily}" FontSize="10"
+                                               VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" Margin="0,0,6,0" />
+                                    <TextBlock Text="Transform" Style="{StaticResource SectionHeaderTextStyle}" />
+                                </DockPanel>
+                                <StackPanel x:Name="ZoneGeometryContent">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
+                                        <ToggleButton x:Name="ZoneInvertXToggle" Content="&#x21C4;" Style="{StaticResource ToggleIconButtonStyle}"
+                                                      ToolTip="Invert X Axis" Checked="ZoneInvertToggle_Changed" Unchecked="ZoneInvertToggle_Changed" />
+                                        <ToggleButton x:Name="ZoneInvertYToggle" Content="&#x21C5;" Style="{StaticResource ToggleIconButtonStyle}" Margin="6,0,0,0"
+                                                      ToolTip="Invert Y Axis" Checked="ZoneInvertToggle_Changed" Unchecked="ZoneInvertToggle_Changed" />
+                                    </StackPanel>
+
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="72" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="70" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="16" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="70" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Position" Style="{StaticResource FieldLabelTextStyle}" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="x" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        <TextBox x:Name="ZoneXBox" Grid.Row="0" Grid.Column="2" ToolTip="X" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                        <TextBlock Grid.Row="0" Grid.Column="3" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,0,0,0" />
+                                        <TextBlock Grid.Row="0" Grid.Column="5" Text="y" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                        <TextBox x:Name="ZoneYBox" Grid.Row="0" Grid.Column="6" ToolTip="Y" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                        <TextBlock Grid.Row="0" Grid.Column="7" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,0,0,0" />
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Size" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="w" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                        <TextBox x:Name="ZoneWBox" Grid.Row="1" Grid.Column="2" ToolTip="W" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                        <TextBlock Grid.Row="1" Grid.Column="3" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
+                                        <TextBlock Grid.Row="1" Grid.Column="5" Text="h" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                        <TextBox x:Name="ZoneHBox" Grid.Row="1" Grid.Column="6" ToolTip="H" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                        <TextBlock Grid.Row="1" Grid.Column="7" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Grid" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="x" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                        <TextBox x:Name="ZoneCellsWBox" Grid.Row="2" Grid.Column="2" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                        <TextBlock Grid.Row="2" Grid.Column="5" Text="y" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                        <TextBox x:Name="ZoneCellsHBox" Grid.Row="2" Grid.Column="6" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                    </Grid>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <StackPanel x:Name="ParamsPanel" />
                     </StackPanel>
                 </ScrollViewer>

@@ -61,7 +61,24 @@ public class EngineTests
     [Fact]
     public void Flash_DecaysAndThenStopsProducingFrames()
     {
-        var engine = NewEngine();
+        var project = Project.CreateEmpty();
+        var zone = new Zone { Id = "pad", Name = "pad" };
+        zone.Params[ParamId.Hue] = 0f;
+        zone.Params[ParamId.Saturation] = 1f;
+        zone.Params[ParamId.Brightness] = 1f;
+        zone.Params[ParamId.EffectDecay] = 0.25f;
+        project.Zones.Add(zone);
+        project.Mappings.Add(new Mapping
+        {
+            Id = "flash-map",
+            Source = SourceAddress.Note(36),
+            Target = TargetRef.Zone("pad"),
+            Param = ParamId.EffectIntensity,
+            Mode = MappingMode.Trigger,
+            EffectId = "flash",
+        });
+
+        var engine = new Engine(project, instanceId: "flash0001");
         engine.Tick(0f);
         engine.TakeFrame(full: true);
 
@@ -70,7 +87,7 @@ public class EngineTests
         engine.TakeFrame();
 
         for (int i = 0; i < 30; i++) engine.Tick(Dt);
-        var atDecay = KickColor(engine);
+        var atDecay = KickColorOf(engine, "pad");
         Assert.InRange(atDecay.R, 10, 16);
 
         int framesWhileDecaying = 0;
@@ -86,7 +103,7 @@ public class EngineTests
             engine.Tick(Dt);
             Assert.Null(engine.TakeFrame());
         }
-        Assert.Equal(Rgb8.Black, KickColor(engine));
+        Assert.Equal(Rgb8.Black, KickColorOf(engine, "pad"));
     }
 
     [Fact]

@@ -32,11 +32,13 @@ public partial class SonolumeView : UserControl
     private Action<ParamId, float>? paramsActiveOnChange;
     private Point zoneDragStart;
     private bool zoneDragArmed;
+    private bool effectSectionExpanded = true;
+    private bool zoneGeometryExpanded = true;
 
     /// <summary>Effect chosen in the picker for the current selection before anything is learned; once a
     /// Trigger/Gate mapping exists its own EffectId is shown (and edited) instead. Reset whenever the selected
     /// zone/group changes.</summary>
-    private string pendingEffectId = FlashEffect.TypeName;
+    private string pendingEffectId = SolidEffect.TypeName;
 
     private sealed record EffectOption(string Id, string Label);
 
@@ -256,12 +258,12 @@ public partial class SonolumeView : UserControl
         currentKind = SelectionKind.None;
         currentId = null;
         session.SelectedZoneId = null;
-        ZoneFieldsPanel.Visibility = Visibility.Collapsed;
-        GroupFieldsPanel.Visibility = Visibility.Collapsed;
+        ZoneIdentityPanel.Visibility = Visibility.Collapsed;
+        GroupIdentityPanel.Visibility = Visibility.Collapsed;
+        ZoneGeometryBorder.Visibility = Visibility.Collapsed;
         EmptyFieldsPanel.Visibility = Visibility.Visible;
         ParamsPanel.Children.Clear();
         ParamsTitle.Visibility = Visibility.Collapsed;
-        ParamsEmptyText.Visibility = Visibility.Visible;
         ParamsActiveCheckBox.Visibility = Visibility.Collapsed;
         ParamsActiveCheckBox.Checked -= ParamsActiveCheckBox_Changed;
         ParamsActiveCheckBox.Unchecked -= ParamsActiveCheckBox_Changed;
@@ -389,11 +391,14 @@ public partial class SonolumeView : UserControl
 
     private void LoadZonePanel(Zone zone, Project project)
     {
-        ZoneFieldsPanel.Visibility = Visibility.Visible;
-        GroupFieldsPanel.Visibility = Visibility.Collapsed;
+        ZoneIdentityPanel.Visibility = Visibility.Visible;
+        GroupIdentityPanel.Visibility = Visibility.Collapsed;
+        ZoneGeometryBorder.Visibility = Visibility.Visible;
+        ZoneGeometryContent.Visibility = zoneGeometryExpanded ? Visibility.Visible : Visibility.Collapsed;
+        ZoneGeometryChevron.Text = zoneGeometryExpanded ? "" : "";
         EmptyFieldsPanel.Visibility = Visibility.Collapsed;
         session.SelectedZoneId = zone.Id;
-        pendingEffectId = FlashEffect.TypeName;
+        pendingEffectId = SolidEffect.TypeName;
 
         suppressInvertToggles = true;
         ZoneInvertXToggle.IsChecked = zone.InvertX;
@@ -415,10 +420,15 @@ public partial class SonolumeView : UserControl
         string zoneId = zone.Id;
         ParamsTitle.Text = zone.Name;
         ParamsTitle.Visibility = Visibility.Visible;
-        ParamsEmptyText.Visibility = Visibility.Collapsed;
-        RebuildParamsPanel(ParamsPanel, zone.Params, TargetRef.Zone(zoneId), (id, raw) => session.SetParam(TargetRef.Zone(zoneId), id, raw));
-        ParamsPanel.Children.Add(BuildParamGroup(ParamsPanel, "Layer",
-            BuildBlendRow(zone, mode => CommitZoneUpdate(zoneId, z => z.Blend = mode))));
+        RebuildParamsPanel(ParamsPanel, zone.Params, TargetRef.Zone(zoneId), (id, raw) => session.SetParam(TargetRef.Zone(zoneId), id, raw),
+            BuildBlendRow(zone, mode => CommitZoneUpdate(zoneId, z => z.Blend = mode)));
+    }
+
+    private void ZoneGeometryHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        zoneGeometryExpanded = !zoneGeometryExpanded;
+        ZoneGeometryContent.Visibility = zoneGeometryExpanded ? Visibility.Visible : Visibility.Collapsed;
+        ZoneGeometryChevron.Text = zoneGeometryExpanded ? "" : "";
     }
 
     private void CommitZoneUpdate(string zoneId, Action<Zone> apply)
@@ -558,11 +568,12 @@ public partial class SonolumeView : UserControl
 
     private void LoadGroupPanel(Group group, Project project)
     {
-        GroupFieldsPanel.Visibility = Visibility.Visible;
-        ZoneFieldsPanel.Visibility = Visibility.Collapsed;
+        GroupIdentityPanel.Visibility = Visibility.Visible;
+        ZoneIdentityPanel.Visibility = Visibility.Collapsed;
+        ZoneGeometryBorder.Visibility = Visibility.Collapsed;
         EmptyFieldsPanel.Visibility = Visibility.Collapsed;
         session.SelectedZoneId = null;
-        pendingEffectId = FlashEffect.TypeName;
+        pendingEffectId = SolidEffect.TypeName;
 
         GroupNameBox.Text = group.Name;
 
@@ -573,7 +584,6 @@ public partial class SonolumeView : UserControl
         string groupId = group.Id;
         ParamsTitle.Text = group.Name;
         ParamsTitle.Visibility = Visibility.Visible;
-        ParamsEmptyText.Visibility = Visibility.Collapsed;
         RebuildParamsPanel(ParamsPanel, group.Params, TargetRef.Group(groupId), (id, raw) => session.SetParam(TargetRef.Group(groupId), id, raw));
     }
 
@@ -729,7 +739,7 @@ public partial class SonolumeView : UserControl
 
     // --- Shared helpers ---
 
-    private void RebuildParamsPanel(StackPanel panel, ParamSet values, TargetRef target, Action<ParamId, float> onChange)
+    private void RebuildParamsPanel(StackPanel panel, ParamSet values, TargetRef target, Action<ParamId, float> onChange, UIElement? blendRow = null)
     {
         panel.Children.Clear();
 
@@ -741,19 +751,26 @@ public partial class SonolumeView : UserControl
         ParamsActiveCheckBox.Unchecked += ParamsActiveCheckBox_Changed;
         ParamsActiveCheckBox.Visibility = Visibility.Visible;
 
-        panel.Children.Add(BuildParamGroup(panel, "Color", BuildColorRow(values, onChange)));
+        var colorRow = BuildColorRow(values, onChange);
+        var effectRow = BuildEffectRow(target, id => colorRow.Visibility = id == RainbowEffect.TypeName ? Visibility.Collapsed : Visibility.Visible);
 
-        panel.Children.Add(BuildParamGroup(panel, "Effect",
-            BuildEffectRow(target),
+        var rows = new List<UIElement>
+        {
+            effectRow,
+            colorRow,
             BuildSliderRow(ParamId.EffectIntensity, values, onChange),
             BuildSliderRow(ParamId.EffectSpeed, values, onChange),
-            BuildSliderRow(ParamId.EffectDecay, values, onChange)));
+            BuildSliderRow(ParamId.EffectDecay, values, onChange),
+        };
+        if (blendRow is not null) rows.Add(blendRow);
+
+        panel.Children.Add(BuildCollapsibleParamGroup(panel, "Effect", rows.ToArray()));
     }
 
     /// <summary>Picks which effect the target's Trigger/Gate mapping uses. Built fresh each time the panel is
     /// rebuilt (on selection change), like the color and blend rows - not kept in sync on the editor's periodic
     /// timer, since nothing else changes a mapping's EffectId out from under it.</summary>
-    private UIElement BuildEffectRow(TargetRef target)
+    private UIElement BuildEffectRow(TargetRef target, Action<string> onEffectIdChanged)
     {
         var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
         var label = new TextBlock { Text = "Type", Width = 60, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
@@ -767,12 +784,14 @@ public partial class SonolumeView : UserControl
         // the default (the built-in kit's kick/snare/hihat, or anything learned before that change) so hold-to-
         // sustain works the moment this panel is opened, not only after re-picking the effect.
         session.SetEffect(target, effectId);
+        onEffectIdChanged(effectId);
 
         combo.SelectionChanged += (_, _) =>
         {
             if (combo.SelectedItem is not EffectOption option) return;
             pendingEffectId = option.Id;
             session.SetEffect(target, option.Id);
+            onEffectIdChanged(option.Id);
         };
 
         DockPanel.SetDock(label, Dock.Left);
@@ -781,13 +800,37 @@ public partial class SonolumeView : UserControl
         return row;
     }
 
-    private static Border BuildParamGroup(FrameworkElement owner, string title, params UIElement[] rows)
+    private Border BuildCollapsibleParamGroup(FrameworkElement owner, string title, params UIElement[] rows)
     {
+        var content = new StackPanel { Visibility = effectSectionExpanded ? Visibility.Visible : Visibility.Collapsed };
+        foreach (var row in rows) content.Children.Add(row);
+
+        var chevron = new TextBlock
+        {
+            Text = effectSectionExpanded ? "" : "",
+            FontFamily = (FontFamily)owner.FindResource("IconFontFamily"),
+            FontSize = 10,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = MutedBrush,
+            Margin = new Thickness(0, 0, 6, 0),
+        };
+
+        var headerText = new TextBlock { Text = title };
+        if (owner.TryFindResource("SectionHeaderTextStyle") is Style headerStyle) headerText.Style = headerStyle;
+
+        var header = new DockPanel { Margin = new Thickness(0, 0, 0, 10), Cursor = Cursors.Hand, Background = Brushes.Transparent };
+        header.Children.Add(chevron);
+        header.Children.Add(headerText);
+        header.MouseLeftButtonUp += (_, _) =>
+        {
+            effectSectionExpanded = !effectSectionExpanded;
+            content.Visibility = effectSectionExpanded ? Visibility.Visible : Visibility.Collapsed;
+            chevron.Text = effectSectionExpanded ? "" : "";
+        };
+
         var stack = new StackPanel();
-        var header = new TextBlock { Text = title, Margin = new Thickness(0, 0, 0, 10) };
-        if (owner.TryFindResource("SectionHeaderTextStyle") is Style headerStyle) header.Style = headerStyle;
         stack.Children.Add(header);
-        foreach (var row in rows) stack.Children.Add(row);
+        stack.Children.Add(content);
 
         var border = new Border { Margin = new Thickness(0, 0, 0, 12), Padding = new Thickness(12), Child = stack };
         if (owner.TryFindResource("GroupBorderStyle") is Style borderStyle) border.Style = borderStyle;
