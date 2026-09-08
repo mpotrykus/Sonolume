@@ -19,10 +19,11 @@ public sealed class PreviewControl : FrameworkElement
     private const double SnapPixels = 8;
 
     private static readonly Pen OutlinePen = MakePen(Color.FromArgb(90, 255, 255, 255), 1);
-    private static readonly Pen SelectedPen = MakePen(Color.FromArgb(230, 90, 170, 255), 2);
-    private static readonly Pen HandlePen = MakePen(Color.FromArgb(230, 90, 170, 255), 1);
-    private static readonly Brush HandleBrush = MakeBrush(Color.FromArgb(230, 30, 30, 36));
+    private static readonly Pen SelectedPen = MakePen(Color.FromArgb(230, 108, 108, 245), 2);
+    private static readonly Pen HandlePen = MakePen(Color.FromArgb(230, 108, 108, 245), 1.5);
+    private static readonly Brush HandleBrush = MakeBrush(Color.FromArgb(255, 30, 30, 36));
     private static readonly Brush LabelBrush = MakeBrush(Color.FromArgb(170, 255, 255, 255));
+    private static readonly Brush KeyLabelBrush = MakeBrush(Color.FromArgb(90, 255, 255, 255));
     private static readonly Typeface LabelTypeface = new("Segoe UI");
 
     private enum DragMode { None, Move, ResizeTopLeft, ResizeTop, ResizeTopRight, ResizeRight, ResizeBottomRight, ResizeBottom, ResizeBottomLeft, ResizeLeft }
@@ -79,7 +80,7 @@ public sealed class PreviewControl : FrameworkElement
     }
 
     /// <summary>Raised when the user clicks a zone that wasn't already selected.</summary>
-    public event Action<string>? ZoneClicked;
+    public event Action<string?>? ZoneClicked;
 
     /// <summary>Raised once, with the final normalized rect, when a move or resize drag ends.</summary>
     public event Action<string, RectF>? ZoneRectCommitted;
@@ -94,6 +95,7 @@ public sealed class PreviewControl : FrameworkElement
         if (current is null) return;
 
         double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
+        var zoneKeyLabels = BuildZoneKeyLabels(current);
 
         foreach (var zone in current.Zones)
         {
@@ -120,17 +122,49 @@ public sealed class PreviewControl : FrameworkElement
             {
                 var text = new FormattedText(zone.Name, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, LabelTypeface, 11, LabelBrush, pixelsPerDip);
                 dc.DrawText(text, new Point(rect.X + 5, rect.Y + 3));
+
+                if (zoneKeyLabels.TryGetValue(zone.Id, out var keyLabel))
+                {
+                    var keyText = new FormattedText(keyLabel, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, LabelTypeface, 11, KeyLabelBrush, pixelsPerDip);
+                    dc.DrawText(keyText, new Point(rect.Right - 5 - keyText.Width, rect.Y + 3));
+                }
             }
 
             if (isSelected) DrawHandles(dc, rect);
         }
     }
 
+    /// <summary>Zone id -> the key(s)/controller(s) mapped to it (e.g. "Note 60"), for the top-right canvas label.</summary>
+    private static Dictionary<string, string> BuildZoneKeyLabels(EngineSnapshot snapshot)
+    {
+        var labels = new Dictionary<string, string>();
+        foreach (var m in snapshot.Mappings)
+        {
+            if (!m.Enabled || !m.Target.StartsWith("Zone ", StringComparison.Ordinal)) continue;
+            string zoneId = m.Target["Zone ".Length..];
+            string source = FormatSource(m.Source);
+            if (labels.TryGetValue(zoneId, out var existing))
+            {
+                if (!existing.Contains(source, StringComparison.Ordinal)) labels[zoneId] = $"{existing}, {source}";
+            }
+            else
+            {
+                labels[zoneId] = source;
+            }
+        }
+        return labels;
+    }
+
+    // Trims the "ch*" (any-channel wildcard) suffix that SourceAddress.ToString() adds by default, since
+    // it's noise for the canvas label where the channel is almost never pinned to something specific.
+    private static string FormatSource(string source) =>
+        source.EndsWith(" ch*", StringComparison.Ordinal) ? source[..^4] : source;
+
     private static void DrawHandles(DrawingContext dc, Rect r)
     {
-        double half = HandleSize / 2;
+        double radius = HandleSize / 2;
         foreach (var p in HandlePoints(r))
-            dc.DrawRectangle(HandleBrush, HandlePen, new Rect(p.X - half, p.Y - half, HandleSize, HandleSize));
+            dc.DrawEllipse(HandleBrush, HandlePen, p, radius, radius);
     }
 
     private static IEnumerable<Point> HandlePoints(Rect r)
@@ -172,7 +206,11 @@ public sealed class PreviewControl : FrameworkElement
         {
             if (ToScreenRect(snapshot.Zones[i].Rect).Contains(pos)) { hit = snapshot.Zones[i]; break; }
         }
-        if (hit is null) return;
+        if (hit is null)
+        {
+            if (selectedZoneId is not null) ZoneClicked?.Invoke(null);
+            return;
+        }
 
         if (hit.Id != selectedZoneId) ZoneClicked?.Invoke(hit.Id);
         StartDrag(hit.Id, hit.Rect, DragMode.Move, pos);

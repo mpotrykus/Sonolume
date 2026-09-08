@@ -10,6 +10,8 @@ public sealed class Zone
     public RectF Rect { get; set; } = new(0f, 0f, 1f, 1f);
     public int CellsW { get; set; } = 1;
     public int CellsH { get; set; } = 1;
+    public bool InvertX { get; set; }
+    public bool InvertY { get; set; }
     public string? GroupId { get; set; }
     public ParamSet Params { get; set; } = new();
 
@@ -20,6 +22,8 @@ public sealed class Zone
         Rect = Rect,
         CellsW = CellsW,
         CellsH = CellsH,
+        InvertX = InvertX,
+        InvertY = InvertY,
         GroupId = GroupId,
         Params = Params.Clone(),
     };

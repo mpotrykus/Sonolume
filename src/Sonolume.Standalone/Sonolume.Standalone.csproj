@@ -4,9 +4,13 @@
     <TargetFramework>net10.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
     <Description>Sonolume standalone app: direct MIDI input, no DAW required.</Description>
+    <ApplicationIcon>Assets\Sonolume.ico</ApplicationIcon>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Melanchall.DryWetMidi" Version="8.0.3" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Assets\Sonolume.ico" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Sonolume.Engine\Sonolume.Engine.csproj" />

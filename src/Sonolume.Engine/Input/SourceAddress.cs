@@ -38,13 +38,18 @@ public readonly record struct SourceAddress(SourceKind Kind, int Channel, int Nu
         string ch = Channel == Any ? "*" : (Channel + 1).ToString();
         return Kind switch
         {
-            SourceKind.MidiNote => $"Note {Number} ch{ch}",
+            SourceKind.MidiNote => $"{NoteName(Number)} ch{ch}",
             SourceKind.MidiCC => $"CC {Number} ch{ch}",
             SourceKind.MidiPitchBend => $"Pitch bend ch{ch}",
             SourceKind.MidiChannelAftertouch => $"Aftertouch ch{ch}",
-            SourceKind.MidiPolyAftertouch => $"Poly aftertouch {Number} ch{ch}",
+            SourceKind.MidiPolyAftertouch => $"Poly aftertouch {NoteName(Number)} ch{ch}",
             SourceKind.HostMacro => $"Macro {Number + 1}",
             _ => $"{Kind} {Number} ch{ch}",
         };
     }
+
+    private static readonly string[] NoteNames = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" };
+
+    // Middle C (note 60) is C4, the common DAW/MIDI convention (as opposed to the C3 used by some Yamaha gear).
+    private static string NoteName(int number) => $"{NoteNames[((number % 12) + 12) % 12]}{number / 12 - 1}";
 }

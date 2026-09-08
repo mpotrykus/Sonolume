@@ -27,6 +27,8 @@ public partial class SonolumeView : UserControl
     private string? currentId;
     private bool isRefreshingLists;
     private bool suppressCombo;
+    private bool suppressInvertToggles;
+    private Action<ParamId, float>? paramsActiveOnChange;
 
     private Window OwnerWindow => Window.GetWindow(this) ?? throw new InvalidOperationException("SonolumeView is not hosted in a Window.");
 
@@ -139,11 +141,16 @@ public partial class SonolumeView : UserControl
             var zone = project.FindZone(currentId!);
             if (zone is null) { ClearSelection(); return; }
 
+            suppressInvertToggles = true;
+            ZoneInvertXToggle.IsChecked = zone.InvertX;
+            ZoneInvertYToggle.IsChecked = zone.InvertY;
+            suppressInvertToggles = false;
+
             SetIfNotFocused(ZoneNameBox, zone.Name);
-            SetIfNotFocused(ZoneXBox, Fmt(zone.Rect.X));
-            SetIfNotFocused(ZoneYBox, Fmt(zone.Rect.Y));
-            SetIfNotFocused(ZoneWBox, Fmt(zone.Rect.W));
-            SetIfNotFocused(ZoneHBox, Fmt(zone.Rect.H));
+            SetIfNotFocused(ZoneXBox, FmtPercent(zone.Rect.X));
+            SetIfNotFocused(ZoneYBox, FmtPercent(zone.Rect.Y));
+            SetIfNotFocused(ZoneWBox, FmtPercent(zone.Rect.W));
+            SetIfNotFocused(ZoneHBox, FmtPercent(zone.Rect.H));
             SetIfNotFocused(ZoneCellsWBox, zone.CellsW.ToString());
             SetIfNotFocused(ZoneCellsHBox, zone.CellsH.ToString());
 
@@ -181,6 +188,10 @@ public partial class SonolumeView : UserControl
         ParamsPanel.Children.Clear();
         ParamsTitle.Text = "Params";
         ParamsEmptyText.Visibility = Visibility.Visible;
+        ParamsActiveCheckBox.Visibility = Visibility.Collapsed;
+        ParamsActiveCheckBox.Checked -= ParamsActiveCheckBox_Changed;
+        ParamsActiveCheckBox.Unchecked -= ParamsActiveCheckBox_Changed;
+        paramsActiveOnChange = null;
     }
 
     // --- Selection ---
@@ -244,11 +255,16 @@ public partial class SonolumeView : UserControl
         EmptyFieldsPanel.Visibility = Visibility.Collapsed;
         session.SelectedZoneId = zone.Id;
 
+        suppressInvertToggles = true;
+        ZoneInvertXToggle.IsChecked = zone.InvertX;
+        ZoneInvertYToggle.IsChecked = zone.InvertY;
+        suppressInvertToggles = false;
+
         ZoneNameBox.Text = zone.Name;
-        ZoneXBox.Text = Fmt(zone.Rect.X);
-        ZoneYBox.Text = Fmt(zone.Rect.Y);
-        ZoneWBox.Text = Fmt(zone.Rect.W);
-        ZoneHBox.Text = Fmt(zone.Rect.H);
+        ZoneXBox.Text = FmtPercent(zone.Rect.X);
+        ZoneYBox.Text = FmtPercent(zone.Rect.Y);
+        ZoneWBox.Text = FmtPercent(zone.Rect.W);
+        ZoneHBox.Text = FmtPercent(zone.Rect.H);
         ZoneCellsWBox.Text = zone.CellsW.ToString();
         ZoneCellsHBox.Text = zone.CellsH.ToString();
 
@@ -257,7 +273,7 @@ public partial class SonolumeView : UserControl
         suppressCombo = false;
 
         string zoneId = zone.Id;
-        ParamsTitle.Text = $"Params: {zone.Name}";
+        ParamsTitle.Text = zone.Name;
         ParamsEmptyText.Visibility = Visibility.Collapsed;
         RebuildParamsPanel(ParamsPanel, zone.Params, (id, raw) => session.SetParam(TargetRef.Zone(zoneId), id, raw));
     }
@@ -312,10 +328,10 @@ public partial class SonolumeView : UserControl
         var zone = projectSnapshot?.FindZone(currentId);
         if (zone is null) return;
 
-        float x = ParseOr(ZoneXBox.Text, zone.Rect.X);
-        float y = ParseOr(ZoneYBox.Text, zone.Rect.Y);
-        float w = ParseOr(ZoneWBox.Text, zone.Rect.W);
-        float h = ParseOr(ZoneHBox.Text, zone.Rect.H);
+        float x = ParsePercentOr(ZoneXBox.Text, zone.Rect.X);
+        float y = ParsePercentOr(ZoneYBox.Text, zone.Rect.Y);
+        float w = ParsePercentOr(ZoneWBox.Text, zone.Rect.W);
+        float h = ParsePercentOr(ZoneHBox.Text, zone.Rect.H);
         int cellsW = Math.Max(1, ParseIntOr(ZoneCellsWBox.Text, zone.CellsW));
         int cellsH = Math.Max(1, ParseIntOr(ZoneCellsHBox.Text, zone.CellsH));
         string name = ZoneNameBox.Text;
@@ -335,6 +351,26 @@ public partial class SonolumeView : UserControl
                 z.CellsW = cellsW;
                 z.CellsH = cellsH;
             });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(OwnerWindow, ex.Message, "Update zone", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        RefreshEditor();
+    }
+
+    private void ZoneInvertToggle_Changed(object sender, RoutedEventArgs e)
+    {
+        if (suppressInvertToggles || currentKind != SelectionKind.Zone || currentId is null) return;
+        bool invertX = ZoneInvertXToggle.IsChecked == true;
+        bool invertY = ZoneInvertYToggle.IsChecked == true;
+        var zone = projectSnapshot?.FindZone(currentId);
+        if (zone is not null && zone.InvertX == invertX && zone.InvertY == invertY) return;
+
+        string id = currentId;
+        try
+        {
+            session.UpdateZone(id, z => { z.InvertX = invertX; z.InvertY = invertY; });
         }
         catch (Exception ex)
         {
@@ -378,7 +414,7 @@ public partial class SonolumeView : UserControl
         suppressCombo = false;
 
         string groupId = group.Id;
-        ParamsTitle.Text = $"Params: {group.Name}";
+        ParamsTitle.Text = group.Name;
         ParamsEmptyText.Visibility = Visibility.Collapsed;
         RebuildParamsPanel(ParamsPanel, group.Params, (id, raw) => session.SetParam(TargetRef.Group(groupId), id, raw));
     }
@@ -538,69 +574,87 @@ public partial class SonolumeView : UserControl
     private void RebuildParamsPanel(StackPanel panel, ParamSet values, Action<ParamId, float> onChange)
     {
         panel.Children.Clear();
-        bool colorRowAdded = false;
-        foreach (var info in ParamInfos.All)
-        {
-            if (info.Id is ParamId.Hue or ParamId.Saturation or ParamId.Brightness)
-            {
-                if (!colorRowAdded)
-                {
-                    colorRowAdded = true;
-                    panel.Children.Add(BuildColorRow(values, onChange));
-                }
-                continue;
-            }
 
-            if (info.Id is ParamId.Active)
-            {
-                panel.Children.Add(BuildActiveRow(values, onChange));
-                continue;
-            }
+        ParamsActiveCheckBox.Checked -= ParamsActiveCheckBox_Changed;
+        ParamsActiveCheckBox.Unchecked -= ParamsActiveCheckBox_Changed;
+        ParamsActiveCheckBox.IsChecked = values[ParamId.Active] >= 0.5f;
+        paramsActiveOnChange = onChange;
+        ParamsActiveCheckBox.Checked += ParamsActiveCheckBox_Changed;
+        ParamsActiveCheckBox.Unchecked += ParamsActiveCheckBox_Changed;
+        ParamsActiveCheckBox.Visibility = Visibility.Visible;
 
-            var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
-            var label = new TextBlock { Text = info.Id.ToString(), Width = 100, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
-            var valueText = new TextBlock { Width = 50, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush, Text = Fmt(values[info.Id]) };
-            var slider = new Slider
-            {
-                Minimum = info.Min,
-                Maximum = info.Max,
-                Value = values[info.Id],
-                VerticalAlignment = VerticalAlignment.Center,
-                IsEnabled = info.Id is not (ParamId.EffectSpeed or ParamId.PosX or ParamId.PosY),
-            };
-            slider.ValueChanged += (_, e) =>
-            {
-                valueText.Text = Fmt((float)e.NewValue);
-                onChange(info.Id, (float)e.NewValue);
-            };
+        panel.Children.Add(BuildParamGroup(panel, "Color", BuildColorRow(values, onChange)));
 
-            DockPanel.SetDock(label, Dock.Left);
-            DockPanel.SetDock(valueText, Dock.Right);
-            row.Children.Add(label);
-            row.Children.Add(valueText);
-            row.Children.Add(slider);
-            panel.Children.Add(row);
-        }
+        panel.Children.Add(BuildParamGroup(panel, "Effect",
+            BuildSliderRow(ParamId.EffectIntensity, values, onChange),
+            BuildSliderRow(ParamId.EffectSpeed, values, onChange),
+            BuildSliderRow(ParamId.EffectDecay, values, onChange)));
     }
 
-    private static UIElement BuildActiveRow(ParamSet values, Action<ParamId, float> onChange)
+    private static Border BuildParamGroup(FrameworkElement owner, string title, params UIElement[] rows)
     {
+        var stack = new StackPanel();
+        var header = new TextBlock { Text = title, Margin = new Thickness(0, 0, 0, 10) };
+        if (owner.TryFindResource("SectionHeaderTextStyle") is Style headerStyle) header.Style = headerStyle;
+        stack.Children.Add(header);
+        foreach (var row in rows) stack.Children.Add(row);
+
+        var border = new Border { Margin = new Thickness(0, 0, 0, 12), Padding = new Thickness(12), Child = stack };
+        if (owner.TryFindResource("GroupBorderStyle") is Style borderStyle) border.Style = borderStyle;
+        return border;
+    }
+
+    private static string DisplayName(ParamId id) => id switch
+    {
+        ParamId.EffectIntensity => "Intensity",
+        ParamId.EffectSpeed => "Speed",
+        ParamId.EffectDecay => "Decay",
+        ParamId.PaletteIndex => "Palette",
+        ParamId.PosX => "X",
+        ParamId.PosY => "Y",
+        _ => id.ToString(),
+    };
+
+    private static UIElement BuildSliderRow(ParamId id, ParamSet values, Action<ParamId, float> onChange)
+    {
+        var info = ParamInfos.Of(id);
         var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
-        var label = new TextBlock { Text = "Active", Width = 100, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
-        var checkBox = new CheckBox { IsChecked = values[ParamId.Active] >= 0.5f, VerticalAlignment = VerticalAlignment.Center };
-        checkBox.Checked += (_, _) => onChange(ParamId.Active, 1f);
-        checkBox.Unchecked += (_, _) => onChange(ParamId.Active, 0f);
+        var label = new TextBlock { Text = DisplayName(id), Width = 60, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
+        var valueText = new TextBlock { Width = 50, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush, Text = FmtSlider(id, info, values[id]) };
+        var slider = new Slider
+        {
+            Minimum = info.Min,
+            Maximum = info.Max,
+            Value = values[id],
+            VerticalAlignment = VerticalAlignment.Center,
+            IsEnabled = id is not (ParamId.EffectSpeed or ParamId.PosX or ParamId.PosY or ParamId.PaletteIndex),
+        };
+        if (id == ParamId.EffectDecay)
+        {
+            slider.IsSnapToTickEnabled = true;
+            slider.TickFrequency = 0.01f;
+        }
+        slider.ValueChanged += (_, e) =>
+        {
+            float value = id == ParamId.EffectDecay ? SnapToStep((float)e.NewValue, 0.01f) : (float)e.NewValue;
+            valueText.Text = FmtSlider(id, info, value);
+            onChange(id, value);
+        };
 
         DockPanel.SetDock(label, Dock.Left);
+        DockPanel.SetDock(valueText, Dock.Right);
         row.Children.Add(label);
-        row.Children.Add(checkBox);
+        row.Children.Add(valueText);
+        row.Children.Add(slider);
         return row;
     }
+
+    private void ParamsActiveCheckBox_Changed(object sender, RoutedEventArgs e) =>
+        paramsActiveOnChange?.Invoke(ParamId.Active, ParamsActiveCheckBox.IsChecked == true ? 1f : 0f);
 
     private static UIElement BuildColorRow(ParamSet values, Action<ParamId, float> onChange)
     {
         var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 16) };
-        stack.Children.Add(new TextBlock { Text = "Color", Foreground = MutedBrush, Margin = new Thickness(0, 0, 0, 8) });
 
         var picker = new ColorPickerControl();
         picker.SetColor(values[ParamId.Hue], values[ParamId.Saturation], values[ParamId.Brightness]);
@@ -663,11 +717,25 @@ public partial class SonolumeView : UserControl
     private static float ParseOr(string text, float fallback) =>
         float.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var v) ? v : fallback;
 
+    private static float ParsePercentOr(string text, float fallback01) =>
+        ParseOr(text, fallback01 * 100f) / 100f;
+
     private static int ParseIntOr(string text, int fallback) => int.TryParse(text, out var v) ? v : fallback;
 
     private static bool Approximately(float a, float b) => Math.Abs(a - b) < 0.0001f;
 
+    private static float SnapToStep(float value, float step) => MathF.Round(value / step) * step;
+
     private static string Fmt(float v) => v.ToString("0.###", CultureInfo.InvariantCulture);
+
+    private static string FmtPercent(float v01) => (v01 * 100f).ToString("0", CultureInfo.InvariantCulture);
+
+    private static string FmtSlider(ParamId id, ParamInfo info, float v) => id switch
+    {
+        ParamId.EffectDecay => string.Create(CultureInfo.InvariantCulture, $"{v * 1000:0}ms"),
+        _ when info.Min == 0f && info.Max == 1f => string.Create(CultureInfo.InvariantCulture, $"{v * 100:0}%"),
+        _ => Fmt(v) + info.Unit,
+    };
 
     private static Brush Freeze(Brush brush)
     {

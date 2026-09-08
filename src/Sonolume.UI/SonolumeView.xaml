@@ -24,11 +24,15 @@
 
         <StackPanel Grid.Row="0">
             <DockPanel LastChildFill="False">
-                <Ellipse DockPanel.Dock="Left" Width="10" Height="10" Fill="{StaticResource AccentBrush}" VerticalAlignment="Center">
-                    <Ellipse.Effect>
+                <Path DockPanel.Dock="Left" Width="20" Height="21.2" Stretch="Uniform" VerticalAlignment="Center"
+                      Fill="{StaticResource AccentBrush}"
+                      Data="M92.618,95.09l50.21-15.587L92.391,65.562l13.422-23.409L85.775,53.097L71.377,0L54.854,56.3l-17.408-9.7
+                            l10.014,19.41L0,79.504l45.102,14.402l-8.541,17.497l17.969-9.302l16.845,48.969l15.339-48.261l14.653,7.71L92.618,95.09z
+                            M70.999,119.236L60.35,88.277l-25.737-8.219l25.847-7.349l10.537-35.903l9.737,35.909l26.572,7.344l-26.467,8.216L70.999,119.236z">
+                    <Path.Effect>
                         <DropShadowEffect Color="{StaticResource AccentColor}" Opacity="0.8" BlurRadius="10" ShadowDepth="0" />
-                    </Ellipse.Effect>
-                </Ellipse>
+                    </Path.Effect>
+                </Path>
                 <TextBlock Text="Sonolume" Style="{StaticResource TitleTextStyle}" VerticalAlignment="Center" Margin="10,0,0,0" DockPanel.Dock="Left" />
                 <TextBox x:Name="ProjectNameBox" DockPanel.Dock="Left" Width="160" Margin="16,0,0,0" VerticalAlignment="Center"
                          LostFocus="ProjectNameBox_Commit" KeyDown="ProjectNameBox_KeyDown" />
@@ -79,19 +83,22 @@
 
         <Grid Grid.Row="1" Margin="0,20,0,0">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="*" MinWidth="360" />
                 <ColumnDefinition Width="16" />
-                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="300" MinWidth="220" MaxWidth="600" />
             </Grid.ColumnDefinitions>
             <Grid.RowDefinitions>
-                <RowDefinition Height="*" />
+                <RowDefinition Height="*" MinHeight="200" />
                 <RowDefinition Height="16" />
-                <RowDefinition Height="240" />
+                <RowDefinition Height="240" MinHeight="120" MaxHeight="500" />
             </Grid.RowDefinitions>
 
             <Border Grid.Row="0" Grid.Column="0" Style="{StaticResource PanelBorderStyle}" Padding="6">
                 <local:PreviewControl x:Name="Preview" />
             </Border>
+
+            <GridSplitter Grid.Row="1" Grid.Column="0" Style="{StaticResource RowSplitterStyle}" />
+            <GridSplitter Grid.Row="0" Grid.RowSpan="3" Grid.Column="1" Style="{StaticResource ColumnSplitterStyle}" />
 
             <!-- Bottom menu: zones/groups list (left) and the selected item's Name/Group/Rect/Cell grid (right) -->
             <Border Grid.Row="2" Grid.Column="0" Style="{StaticResource PanelBorderStyle}">
@@ -125,7 +132,14 @@
 
                         <StackPanel Grid.Column="2">
                             <StackPanel x:Name="ZoneFieldsPanel" Visibility="Collapsed">
-                                <TextBlock Text="Zone" Style="{StaticResource PanelHeaderTextStyle}" />
+                                <TextBlock Text="Zone" Style="{StaticResource PanelHeaderTextStyle}" Margin="0,0,0,16" />
+
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,16">
+                                    <ToggleButton x:Name="ZoneInvertXToggle" Content="&#x21C4;" Style="{StaticResource ToggleIconButtonStyle}"
+                                                  ToolTip="Invert X Axis" Checked="ZoneInvertToggle_Changed" Unchecked="ZoneInvertToggle_Changed" />
+                                    <ToggleButton x:Name="ZoneInvertYToggle" Content="&#x21C5;" Style="{StaticResource ToggleIconButtonStyle}" Margin="6,0,0,0"
+                                                  ToolTip="Invert Y Axis" Checked="ZoneInvertToggle_Changed" Unchecked="ZoneInvertToggle_Changed" />
+                                </StackPanel>
 
                                 <DockPanel Margin="0,0,0,8">
                                     <TextBlock Text="Name" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
@@ -137,32 +151,44 @@
                                     <ComboBox x:Name="ZoneGroupCombo" DisplayMemberPath="Name" SelectionChanged="ZoneGroupCombo_SelectionChanged" />
                                 </DockPanel>
 
-                                <TextBlock Text="Rect: X, Y, W, H (0..1)" Style="{StaticResource CaptionTextStyle}" Margin="0,0,0,6" />
-                                <Grid Margin="0,0,0,16">
+                                <Grid Margin="0,0,0,8">
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="72" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="16" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="70" />
+                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="ZoneXBox" Grid.Column="0" ToolTip="X" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                    <TextBox x:Name="ZoneYBox" Grid.Column="2" ToolTip="Y" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                    <TextBox x:Name="ZoneWBox" Grid.Column="4" ToolTip="W" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                    <TextBox x:Name="ZoneHBox" Grid.Column="6" ToolTip="H" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                </Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
 
-                                <TextBlock Text="Cell grid: columns, rows" Style="{StaticResource CaptionTextStyle}" Margin="0,0,0,6" />
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <TextBox x:Name="ZoneCellsWBox" Grid.Column="0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                    <TextBox x:Name="ZoneCellsHBox" Grid.Column="2" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Position" Style="{StaticResource FieldLabelTextStyle}" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="x" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <TextBox x:Name="ZoneXBox" Grid.Row="0" Grid.Column="2" ToolTip="X" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                    <TextBlock Grid.Row="0" Grid.Column="3" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,0,0,0" />
+                                    <TextBlock Grid.Row="0" Grid.Column="5" Text="y" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                                    <TextBox x:Name="ZoneYBox" Grid.Row="0" Grid.Column="6" ToolTip="Y" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                    <TextBlock Grid.Row="0" Grid.Column="7" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,0,0,0" />
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Size" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="w" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                    <TextBox x:Name="ZoneWBox" Grid.Row="1" Grid.Column="2" ToolTip="W" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                    <TextBlock Grid.Row="1" Grid.Column="3" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
+                                    <TextBlock Grid.Row="1" Grid.Column="5" Text="h" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                    <TextBox x:Name="ZoneHBox" Grid.Row="1" Grid.Column="6" ToolTip="H" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                    <TextBlock Grid.Row="1" Grid.Column="7" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Grid" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="x" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                    <TextBox x:Name="ZoneCellsWBox" Grid.Row="2" Grid.Column="2" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                    <TextBlock Grid.Row="2" Grid.Column="5" Text="y" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                    <TextBox x:Name="ZoneCellsHBox" Grid.Row="2" Grid.Column="6" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
                                 </Grid>
                             </StackPanel>
 
@@ -193,7 +219,10 @@
             <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="2" Style="{StaticResource PanelBorderStyle}">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
-                        <TextBlock x:Name="ParamsTitle" Text="Params" Style="{StaticResource PanelHeaderTextStyle}" />
+                        <DockPanel LastChildFill="False">
+                            <TextBlock x:Name="ParamsTitle" Text="Params" Style="{StaticResource PanelHeaderTextStyle}" DockPanel.Dock="Left" />
+                            <CheckBox x:Name="ParamsActiveCheckBox" Content="Active" DockPanel.Dock="Right" VerticalAlignment="Center" Visibility="Collapsed" />
+                        </DockPanel>
                         <TextBlock x:Name="ParamsEmptyText" Text="Select a zone or group to edit its parameters." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
                         <StackPanel x:Name="ParamsPanel" />
                     </StackPanel>
