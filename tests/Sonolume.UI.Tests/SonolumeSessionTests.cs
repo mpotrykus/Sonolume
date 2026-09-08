@@ -93,12 +93,12 @@ public class SonolumeSessionTests
     public void SetEffect_UpgradesDefaultKitTriggerMappingToGate()
     {
         using var session = NewSession();
-        var kick = session.GetProjectCopy().Mappings.Single(m => m.Target == TargetRef.Zone("kick"));
+        var kick = session.GetProjectCopy().Mappings.Single(m => m.Target == TargetRef.Zone("kick") && m.Mode is MappingMode.Trigger or MappingMode.Gate);
         Assert.Equal(MappingMode.Trigger, kick.Mode);
 
         session.SetEffect(TargetRef.Zone("kick"), "flash");
 
-        var updated = session.GetProjectCopy().Mappings.Single(m => m.Target == TargetRef.Zone("kick"));
+        var updated = session.GetProjectCopy().Mappings.Single(m => m.Target == TargetRef.Zone("kick") && m.Mode is MappingMode.Trigger or MappingMode.Gate);
         Assert.Equal(MappingMode.Gate, updated.Mode);
         Assert.Equal("flash", updated.EffectId);
     }
@@ -113,7 +113,7 @@ public class SonolumeSessionTests
         session.Undo();
 
         Assert.False(session.CanUndo); // only one undo entry existed, despite two calls
-        var reverted = session.GetProjectCopy().Mappings.Single(m => m.Target == TargetRef.Zone("kick"));
+        var reverted = session.GetProjectCopy().Mappings.Single(m => m.Target == TargetRef.Zone("kick") && m.Mode is MappingMode.Trigger or MappingMode.Gate);
         Assert.Equal(MappingMode.Trigger, reverted.Mode);
     }
 

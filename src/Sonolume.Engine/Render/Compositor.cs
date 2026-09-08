@@ -135,7 +135,7 @@ public sealed class Compositor
 
     public void RefreshEventDriven(IEnumerable<Mapping> mappings)
     {
-        var eventMappings = mappings.Where(m => m.Enabled && m.Mode != MappingMode.Set).ToArray();
+        var eventMappings = mappings.Where(m => m.Enabled && m.Mode is MappingMode.Trigger or MappingMode.Gate).ToArray();
         foreach (var z in zones)
         {
             bool driven = false;

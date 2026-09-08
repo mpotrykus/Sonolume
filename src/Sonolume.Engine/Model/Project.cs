@@ -153,6 +153,10 @@ public sealed class Project
         project.Mappings.Add(TriggerMapping("map-hihat", 42, TargetRef.Zone("hihat")));
         project.Mappings.Add(TriggerMapping("map-drums", 49, TargetRef.Group("drums")));
 
+        // Zones only, not the "drums" group - group params multiply onto their children (see Compositor), so
+        // giving both the same macro-per-param convention would double-apply every macro move.
+        DefaultMacros.BackfillIfMissing(project);
+
         return project;
     }
 

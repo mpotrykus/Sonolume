@@ -27,6 +27,7 @@ public sealed class Engine
     {
         Effects = effects ?? EffectRegistry.CreateDefault();
         InstanceId = instanceId ?? Guid.NewGuid().ToString("N")[..8];
+        DefaultMacros.BackfillIfMissing(project);
         Project = project;
         mappingEngine = new MappingEngine(project.Mappings);
         compositor = new Compositor(project, Effects);
@@ -46,6 +47,7 @@ public sealed class Engine
 
     public void LoadProject(Project project)
     {
+        DefaultMacros.BackfillIfMissing(project);
         Project = project;
         RebuildRuntime();
     }
@@ -125,6 +127,9 @@ public sealed class Engine
                 if (action.Event.Type == ControlEventType.Trigger) Trigger(m, action);
                 else compositor.Release(m.Target);
                 break;
+            case MappingMode.Select:
+                SelectEffect(m);
+                break;
         }
     }
 
@@ -134,6 +139,18 @@ public sealed class Engine
         if (!Effects.Contains(effectId)) effectId = FlashEffect.TypeName;
         var info = new TriggerInfo(action.Value01, action.Event.Source.Number, action.Event.Value01, action.Event.TimestampTicks, Sustain: m.Mode == MappingMode.Gate);
         compositor.Trigger(m.Target, effectId, info);
+    }
+
+    /// <summary>Keyswitch: a Select-mode mapping firing repoints every Trigger/Gate mapping on the same target at
+    /// this mapping's EffectId, live - the next hit plays the new effect. Mutates the Mapping objects
+    /// <see cref="MappingEngine"/> already holds references to (not copies), so no rebuild is needed.</summary>
+    private void SelectEffect(Mapping m)
+    {
+        string? effectId = m.EffectId;
+        if (effectId is null || !Effects.Contains(effectId)) return;
+        foreach (var candidate in Project.Mappings)
+            if (candidate.Target == m.Target && candidate.Mode is MappingMode.Trigger or MappingMode.Gate)
+                candidate.EffectId = effectId;
     }
 
     /// <summary>Reports the host's current tempo, if any, for tempo-locked effects. Call every tick (or every audio

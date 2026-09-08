@@ -18,6 +18,9 @@ public readonly record struct SourceAddress(SourceKind Kind, int Channel, int Nu
 {
     public const int Any = -1;
 
+    /// <summary>Number of host-automation macro parameters the VST3 plugin exposes (see <see cref="HostMacro"/>).</summary>
+    public const int MacroCount = 8;
+
     public bool Matches(in SourceAddress concrete) =>
         Kind == concrete.Kind
         && (Channel == Any || Channel == concrete.Channel)

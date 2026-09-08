@@ -11,6 +11,10 @@ public enum MappingMode
     Trigger,
     /// <summary>Gated: trigger starts the effect, release ends it.</summary>
     Gate,
+    /// <summary>Keyswitch: a trigger repoints the target's Trigger/Gate mapping(s) at this mapping's EffectId,
+    /// live (a low-octave note picks which effect the zone's key plays next, the way sample libraries switch
+    /// articulations) - it never renders anything itself.</summary>
+    Select,
 }
 
 public enum TargetKind
@@ -46,6 +50,7 @@ public sealed class Mapping
         MappingMode.Set => type == ControlEventType.Set,
         MappingMode.Trigger => type == ControlEventType.Trigger,
         MappingMode.Gate => type is ControlEventType.Trigger or ControlEventType.Release,
+        MappingMode.Select => type == ControlEventType.Trigger,
         _ => false,
     };
 }

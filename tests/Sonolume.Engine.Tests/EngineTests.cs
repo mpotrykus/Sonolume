@@ -345,6 +345,69 @@ public class EngineTests
         return frame.Regions.Single(r => r.ZoneId == zoneId).Cells[0];
     }
 
+    /// <summary>Exercises the exact pipeline a host-automated CC drives: PushControl with a HostMacro source,
+    /// resolved through a Set-mode Mapping, on a zone with no Trigger/Gate mapping (so it isn't event-driven and
+    /// isn't scaled by any effect's captured level) - isolating whether that path works at all, independent of
+    /// REAPER/AudioPlugSharp and independent of the Solid-effect level-compositing that confounds testing on the
+    /// default kit's zones.</summary>
+    [Fact]
+    public void HostMacroSet_ControlsBrightness_OnNonEventDrivenZone()
+    {
+        var project = Project.CreateEmpty();
+        var zone = new Zone { Id = "z1", Name = "Z1" };
+        zone.Params[ParamId.Hue] = 0f;
+        zone.Params[ParamId.Saturation] = 1f;
+        project.Zones.Add(zone);
+        project.Mappings.Add(new Mapping
+        {
+            Id = "macro-brightness",
+            Source = SourceAddress.HostMacro(0),
+            Target = TargetRef.Zone("z1"),
+            Param = ParamId.Brightness,
+            Mode = MappingMode.Set,
+            Transform = Transform.Identity,
+        });
+
+        var engine = new Engine(project, instanceId: "macro0001");
+        engine.Tick(0f);
+        engine.TakeFrame(full: true);
+
+        engine.PushControl(new ControlEvent(SourceAddress.HostMacro(0), ControlEventType.Set, 0.3f, 0));
+        engine.Tick(0f);
+
+        var c = KickColorOf(engine, "z1");
+        Assert.InRange(c.R, 75, 78);
+        Assert.Equal(0, c.G);
+        Assert.Equal(0, c.B);
+    }
+
+    /// <summary>Exercises the keyswitch pipeline: a Select-mode mapping firing (a note bound to a specific effect,
+    /// see SonolumeView.BuildEffectRow's "Learn" button) repoints the target's Trigger mapping's EffectId live, so
+    /// the *next* trigger plays the newly selected effect - independent of any UI, and independent of whether the
+    /// keyswitch note arrives before or after the zone's own "Key" mapping is ever hit.</summary>
+    [Fact]
+    public void SelectMode_KeyswitchNote_RepointsTriggerMappingsEffectId()
+    {
+        var project = MakeEffectProject("solid");
+        project.Mappings.Add(new Mapping
+        {
+            Id = "keyswitch-flash",
+            Source = SourceAddress.Note(24),
+            Target = TargetRef.Zone("strip"),
+            Param = ParamId.EffectIntensity,
+            Mode = MappingMode.Select,
+            EffectId = "flash",
+            Transform = Transform.Identity,
+        });
+
+        var engine = new Engine(project, instanceId: "select001");
+        Assert.Equal("solid", engine.Snapshot().Mappings.Single(m => m.Id == "effect-map").Effect);
+
+        engine.PushControl(new ControlEvent(SourceAddress.Note(24), ControlEventType.Trigger, 1f, 0));
+
+        Assert.Equal("flash", engine.Snapshot().Mappings.Single(m => m.Id == "effect-map").Effect);
+    }
+
     private static Project MakeEffectProject(string effectId)
     {
         var project = Project.CreateEmpty();

@@ -4,6 +4,7 @@ using AudioPlugSharp;
 using AudioPlugSharpWPF;
 using Sonolume.Engine.Core;
 using Sonolume.Engine.Input;
+using Sonolume.Engine.Mappings;
 using Sonolume.UI;
 
 namespace Sonolume.Plugin;
@@ -38,6 +39,35 @@ public sealed class SonolumePlugin : AudioPluginWPF
     {
         base.Initialize();
         OutputPorts = [output = new DoubleAudioIOPort("Silent Output", EAudioChannelConfiguration.Stereo)];
+
+        // Host-automatable macros: labeled parameters every DAW shows immediately, no MIDI Learn needed. Which
+        // zone/group param each one drives is picked from Sonolume's own UI (see DefaultMacros for the starting
+        // convention every new zone gets). IDs "macro1".."macroN" are parsed back out in HandleParameterChange.
+        for (int i = 0; i < SourceAddress.MacroCount; i++)
+        {
+            var parameter = new AudioPluginParameter
+            {
+                ID = $"macro{i + 1}",
+                // 0-based index (matching Sonolume's own macro picker - see BuildMacroOptions) plus the param this
+                // slot drives by DEFAULT convention (DefaultMacros.Convention), e.g. "CC 00 Brightness". This is a
+                // static label baked in at declare time, not a live one: AudioPlugSharp has no API to rename a
+                // parameter after the host has seen it, so if a zone gets repointed to a different macro via the
+                // picker, this label no longer describes it - Sonolume's own UI is the source of truth for that.
+                Name = $"CC {i:00} {DefaultMacros.Convention[i]}",
+                MinValue = 0,
+                MaxValue = 1,
+                DefaultValue = 0,
+            };
+            AddParameter(parameter);
+
+            // AudioPlugSharp has no generic "any raw MIDI CC" pass-through - a CC only reaches
+            // HandleParameterChange if it's explicitly bound to a parameter here. Without this, drawing into a
+            // DAW's raw MIDI CC lane (as opposed to a host parameter-automation envelope) does nothing at all,
+            // silently. Bound 1:1 by number so "CC 0N" means the same raw MIDI CC either way; note this does
+            // shadow the conventional uses of CC0 (bank select), CC1 (mod wheel), and CC7 (volume) on this device.
+            AddMidiControllerMapping(parameter, (uint)i);
+        }
+
         EnsureSession();
     }
 
@@ -64,6 +94,20 @@ public sealed class SonolumePlugin : AudioPluginWPF
 
     public override void HandlePolyPressure(int channel, int noteNumber, float pressure, int sampleOffset) =>
         session?.Enqueue(MidiEvent.PolyAftertouch(channel, noteNumber, (int)MathF.Round(pressure * 127f), Clock.Now()));
+
+    public override void HandleParameterChange(AudioPluginParameter parameter, double newNormalizedValue, int sampleOffset)
+    {
+        base.HandleParameterChange(parameter, newNormalizedValue, sampleOffset);
+
+        // ID-based, not Array.IndexOf(macroParams, parameter): if the bridge ever hands back a different managed
+        // wrapper instance than the one AddParameter was called with, reference equality would silently miss every
+        // change. The ID we assigned ("macro1".."macro8") is stable regardless.
+        if (parameter.ID is { } id && id.StartsWith("macro", StringComparison.Ordinal)
+            && int.TryParse(id.AsSpan("macro".Length), out int oneBased))
+        {
+            session?.SetMacroValue(oneBased - 1, (float)newNormalizedValue);
+        }
+    }
 
     public override void Process()
     {

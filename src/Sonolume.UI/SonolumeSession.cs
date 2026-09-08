@@ -1,4 +1,6 @@
+using System.Threading;
 using Sonolume.Engine;
+using Sonolume.Engine.Core;
 using Sonolume.Engine.Input;
 using Sonolume.Engine.Mappings;
 using Sonolume.Engine.Model;
@@ -59,12 +61,16 @@ public sealed class SonolumeSession : IDisposable
     /// when there is nothing to write (including after undoing back to that point).</summary>
     public bool HasUnsavedChanges { get; private set; }
 
-    /// <summary>The zone or group currently armed to learn the next MIDI key, if any. UI-thread-only.</summary>
-    public TargetRef? PendingLearnTarget { get; private set; }
+    /// <summary>The target/param/mode currently armed to learn the next matching MIDI event, if any.
+    /// UI-thread-only. Only one control can be listening at a time (the engine holds a single pending request).</summary>
+    public (TargetRef Target, ParamId Param, MappingMode Mode)? PendingLearn { get; private set; }
 
-    /// <summary>True while the engine is actually waiting on a controller move for <see cref="PendingLearnTarget"/>
-    /// (lags <see cref="PendingLearnTarget"/> slightly, since it comes from the polled engine snapshot).</summary>
+    /// <summary>True while the engine is actually waiting on a controller move for <see cref="PendingLearn"/>
+    /// (lags <see cref="PendingLearn"/> slightly, since it comes from the polled engine snapshot).</summary>
     public bool IsLearning => Runner.LatestSnapshot?.IsLearning ?? false;
+
+    public bool IsPendingLearn(TargetRef target, ParamId param, MappingMode mode) =>
+        PendingLearn is { } p && p.Target == target && p.Param == param && p.Mode == mode;
 
     public void Enqueue(in MidiEvent e) => Runner.Enqueue(e);
 
@@ -113,7 +119,13 @@ public sealed class SonolumeSession : IDisposable
         HasUnsavedChanges = true;
     }
 
-    public void AddZone(Zone zone) => MutateWithUndo(e => e.AddZone(zone));
+    /// <summary>Adds the zone pre-wired with the default macro-per-param convention (see <see cref="DefaultMacros"/>)
+    /// so its continuous params are controllable from the DAW's host parameters immediately, no setup needed.</summary>
+    public void AddZone(Zone zone) => MutateWithUndo(e =>
+    {
+        e.AddZone(zone);
+        foreach (var m in DefaultMacros.For(TargetRef.Zone(zone.Id))) e.AddMapping(m);
+    });
 
     public void RemoveZone(string id) => MutateWithUndo(e => e.RemoveZone(id));
 
@@ -138,23 +150,26 @@ public sealed class SonolumeSession : IDisposable
 
     public void RenameProject(string name) => MutateWithUndo(e => e.RenameProject(name));
 
-    /// <summary>Removes every mapping targeting <paramref name="target"/> (e.g. clearing a zone/group's key).</summary>
+    /// <summary>Clears <paramref name="target"/>'s note-triggered "Key" mapping(s) - Trigger/Gate only, leaving its
+    /// Set-mode macro mappings (see <see cref="DefaultMacros"/>) and Select-mode keyswitch mappings (see
+    /// <see cref="RemoveKeyswitch"/>) untouched.</summary>
     public void RemoveMappingsForTarget(TargetRef target) => MutateWithUndo(e =>
     {
-        var ids = e.Project.Mappings.Where(m => m.Target == target).Select(m => m.Id).ToList();
+        var ids = e.Project.Mappings.Where(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate)
+            .Select(m => m.Id).ToList();
         foreach (var id in ids) e.RemoveMapping(id);
     });
 
     /// <summary>Switches the effect used by <paramref name="target"/>'s Trigger/Gate mapping(s), if any exist
-    /// (Set-mode mappings ignore EffectId and are left alone), and upgrades them to Gate so the effect holds for
-    /// as long as the key is down - covers mappings learned before Gate became the default, and the built-in
-    /// default kit's Trigger mappings. No-op - and no undo entry - if nothing is learned yet (the effect picker's
-    /// selection is then just remembered for the next <see cref="BeginLearn"/>) or if every matching mapping
-    /// already has this EffectId and is already Gate, so the effect picker can call this unconditionally on every
-    /// open without spamming undo history.</summary>
+    /// (Set-mode macro mappings and Select-mode keyswitch mappings ignore this and are left alone), and upgrades
+    /// them to Gate so the effect holds for as long as the key is down - covers mappings learned before Gate became
+    /// the default, and the built-in default kit's Trigger mappings. No-op - and no undo entry - if nothing is
+    /// learned yet (the effect picker's selection is then just remembered for the next <see cref="BeginLearn"/>) or
+    /// if every matching mapping already has this EffectId and is already Gate, so the effect picker can call this
+    /// unconditionally on every open without spamming undo history.</summary>
     public void SetEffect(TargetRef target, string effectId)
     {
-        var matching = GetProjectCopy().Mappings.Where(m => m.Target == target && m.Mode != MappingMode.Set).ToList();
+        var matching = GetProjectCopy().Mappings.Where(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate).ToList();
         if (matching.Count == 0) return;
         if (matching.All(m => m.EffectId == effectId && m.Mode == MappingMode.Gate)) return;
 
@@ -162,18 +177,28 @@ public sealed class SonolumeSession : IDisposable
         {
             foreach (var m in e.Project.Mappings)
             {
-                if (m.Target != target || m.Mode == MappingMode.Set) continue;
+                if (m.Target != target || m.Mode is not (MappingMode.Trigger or MappingMode.Gate)) continue;
                 m.EffectId = effectId;
                 m.Mode = MappingMode.Gate;
             }
         });
     }
 
+    /// <summary>Removes <paramref name="target"/>'s keyswitch note for <paramref name="effectId"/>, if one is
+    /// bound (see <see cref="BeginLearn"/> with <see cref="MappingMode.Select"/>) - lets the user re-learn a
+    /// different key for that effect instead of stacking a second note on top of the old one.</summary>
+    public void RemoveKeyswitch(TargetRef target, string effectId) => MutateWithUndo(e =>
+    {
+        var ids = e.Project.Mappings.Where(m => m.Target == target && m.Mode == MappingMode.Select && m.EffectId == effectId)
+            .Select(m => m.Id).ToList();
+        foreach (var id in ids) e.RemoveMapping(id);
+    });
+
     /// <summary>Arms the engine to turn the next matching MIDI event into a mapping targeting
     /// <paramref name="target"/>. Not undoable itself; <see cref="PollLearn"/> folds the result in once it lands.</summary>
     public void BeginLearn(TargetRef target, ParamId param, MappingMode mode, string? effectId = null)
     {
-        PendingLearnTarget = target;
+        PendingLearn = (target, param, mode);
         learnBeforeSnapshot = ExportProjectJson();
         Runner.Post(e => e.BeginLearn(new LearnRequest(target, param, mode, effectId)));
     }
@@ -181,8 +206,47 @@ public sealed class SonolumeSession : IDisposable
     public void CancelLearn()
     {
         Runner.Post(e => e.CancelLearn());
-        PendingLearnTarget = null;
+        PendingLearn = null;
         learnBeforeSnapshot = null;
+    }
+
+    /// <summary>Points <paramref name="param"/> on <paramref name="target"/> at host macro <paramref name="macroIndex"/>
+    /// (0-based), replacing whatever Set-mode mapping was there before; <c>null</c> clears it entirely. Unlike MIDI
+    /// Learn, this never needs to "listen" - the host tells us exactly which parameter changed, so a direct pick is
+    /// enough.</summary>
+    public void SetMacroMapping(TargetRef target, ParamId param, int? macroIndex) => MutateWithUndo(e =>
+    {
+        var stale = e.Project.Mappings.Where(m => m.Target == target && m.Param == param && m.Mode == MappingMode.Set)
+            .Select(m => m.Id).ToList();
+        foreach (var id in stale) e.RemoveMapping(id);
+
+        if (macroIndex is { } idx)
+        {
+            e.AddMapping(new Mapping
+            {
+                Id = $"macro-{Guid.NewGuid():N}",
+                Source = SourceAddress.HostMacro(idx),
+                Target = target,
+                Param = param,
+                Mode = MappingMode.Set,
+                Transform = Transform.Identity,
+            });
+        }
+    });
+
+    private long macroEventsReceived;
+
+    /// <summary>How many host macro parameter changes have reached <see cref="SetMacroValue"/>, for the "CC: N"
+    /// status readout - if that number never moves while you're automating a CC in the DAW, the host isn't
+    /// delivering the parameter change to the plugin at all (nothing downstream of it is the problem).</summary>
+    public long MacroEventsReceived => Interlocked.Read(ref macroEventsReceived);
+
+    /// <summary>Feeds a host macro parameter's new value into the engine as a control event, exactly like an
+    /// incoming MIDI CC would be - the plugin calls this from its parameter-change callback.</summary>
+    public void SetMacroValue(int macroIndex, float value01)
+    {
+        Interlocked.Increment(ref macroEventsReceived);
+        Runner.Post(e => e.PushControl(new ControlEvent(SourceAddress.HostMacro(macroIndex), ControlEventType.Set, value01, Clock.Now())));
     }
 
     /// <summary>Call periodically (the editor already polls at a fixed interval). Once a pending learn resolves -
@@ -190,10 +254,10 @@ public sealed class SonolumeSession : IDisposable
     /// history and unsaved-changes tracking like any other structural edit.</summary>
     public void PollLearn()
     {
-        if (PendingLearnTarget is null || IsLearning) return;
+        if (PendingLearn is null || IsLearning) return;
         string before = learnBeforeSnapshot!;
         learnBeforeSnapshot = null;
-        PendingLearnTarget = null;
+        PendingLearn = null;
         PushCapped(undoStack, before);
         redoStack.Clear();
         HasUnsavedChanges = ExportProjectJson() != savedSnapshot;
