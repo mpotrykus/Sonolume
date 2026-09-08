@@ -90,6 +90,14 @@
         <Setter Property="Margin" Value="10,4" />
     </Style>
 
+    <Style x:Key="StatDividerStyle" TargetType="Border">
+        <Setter Property="Width" Value="1" />
+        <Setter Property="Height" Value="12" />
+        <Setter Property="Background" Value="{StaticResource InputBorderBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="16,0" />
+    </Style>
+
     <!-- Draggable panel dividers -->
     <Style x:Key="ColumnSplitterStyle" TargetType="GridSplitter">
         <Setter Property="HorizontalAlignment" Value="Stretch" />

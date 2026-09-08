@@ -13,6 +13,10 @@ public sealed class Zone
     public bool InvertX { get; set; }
     public bool InvertY { get; set; }
     public string? GroupId { get; set; }
+    /// <summary>Stacking order among overlapping zones; higher draws on top. Ties break by list order.</summary>
+    public int ZIndex { get; set; }
+    /// <summary>How this zone composites over lower-ZIndex zones wherever their rects overlap it.</summary>
+    public BlendMode Blend { get; set; } = BlendMode.Normal;
     public ParamSet Params { get; set; } = new();
 
     public Zone Clone() => new()
@@ -25,6 +29,8 @@ public sealed class Zone
         InvertX = InvertX,
         InvertY = InvertY,
         GroupId = GroupId,
+        ZIndex = ZIndex,
+        Blend = Blend,
         Params = Params.Clone(),
     };
 }

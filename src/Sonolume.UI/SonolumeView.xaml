@@ -132,9 +132,7 @@
 
                         <StackPanel Grid.Column="2">
                             <StackPanel x:Name="ZoneFieldsPanel" Visibility="Collapsed">
-                                <TextBlock Text="Zone" Style="{StaticResource PanelHeaderTextStyle}" Margin="0,0,0,16" />
-
-                                <StackPanel Orientation="Horizontal" Margin="0,4,0,16">
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                                     <ToggleButton x:Name="ZoneInvertXToggle" Content="&#x21C4;" Style="{StaticResource ToggleIconButtonStyle}"
                                                   ToolTip="Invert X Axis" Checked="ZoneInvertToggle_Changed" Unchecked="ZoneInvertToggle_Changed" />
                                     <ToggleButton x:Name="ZoneInvertYToggle" Content="&#x21C5;" Style="{StaticResource ToggleIconButtonStyle}" Margin="6,0,0,0"
@@ -220,7 +218,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
                         <DockPanel LastChildFill="False">
-                            <TextBlock x:Name="ParamsTitle" Text="Params" Style="{StaticResource PanelHeaderTextStyle}" DockPanel.Dock="Left" />
+                            <TextBlock x:Name="ParamsTitle" Text="Params" Style="{StaticResource PanelHeaderTextStyle}" DockPanel.Dock="Left" Visibility="Collapsed" />
                             <CheckBox x:Name="ParamsActiveCheckBox" Content="Active" DockPanel.Dock="Right" VerticalAlignment="Center" Visibility="Collapsed" />
                         </DockPanel>
                         <TextBlock x:Name="ParamsEmptyText" Text="Select a zone or group to edit its parameters." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
@@ -231,16 +229,14 @@
         </Grid>
 
         <StackPanel Grid.Row="2" Margin="0,20,0,0">
-            <Border Style="{StaticResource HorizontalDividerStyle}" Margin="0,0,0,16" />
-            <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                    <ColumnDefinition Width="Auto" />
-                </Grid.ColumnDefinitions>
-                <TextBlock x:Name="MidiText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource MutedTextStyle}" Text="MIDI: 0 events" />
-                <TextBlock x:Name="StatusText" Grid.Column="2" Margin="24,0,0,0" VerticalAlignment="Center" Style="{StaticResource MutedTextStyle}" />
-            </Grid>
+            <Border Style="{StaticResource HorizontalDividerStyle}" Margin="0,0,0,12" />
+            <DockPanel LastChildFill="False">
+                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                    <TextBlock x:Name="MidiText" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" Text="MIDI: 0 events" />
+                    <Border Style="{StaticResource StatDividerStyle}" />
+                    <TextBlock x:Name="StatusText" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
+                </StackPanel>
+            </DockPanel>
         </StackPanel>
     </Grid>
 </UserControl>

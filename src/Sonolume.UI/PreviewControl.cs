@@ -17,8 +17,9 @@ public sealed class PreviewControl : FrameworkElement
     private const double HandleSize = 8;
     private const float MinZoneSize = 0.02f;
     private const double SnapPixels = 8;
+    private const double ZoneCornerRadius = 4;
 
-    private static readonly Pen OutlinePen = MakePen(Color.FromArgb(90, 255, 255, 255), 1);
+    private static readonly Pen OutlinePen = MakePen(Color.FromArgb(40, 255, 255, 255), 1);
     private static readonly Pen SelectedPen = MakePen(Color.FromArgb(230, 108, 108, 245), 2);
     private static readonly Pen HandlePen = MakePen(Color.FromArgb(230, 108, 108, 245), 1.5);
     private static readonly Brush HandleBrush = MakeBrush(Color.FromArgb(255, 30, 30, 36));
@@ -97,13 +98,16 @@ public sealed class PreviewControl : FrameworkElement
         double pixelsPerDip = VisualTreeHelper.GetDpi(this).PixelsPerDip;
         var zoneKeyLabels = BuildZoneKeyLabels(current);
 
-        foreach (var zone in current.Zones)
+        // Painted in the same bottom-to-top stacking order the compositor blends in, so an overlapping zone's
+        // outline/handles (and any zone drawn fully opaque) don't visually bury a higher-ZIndex zone underneath it.
+        foreach (var zone in current.Zones.OrderBy(z => z.ZIndex))
         {
             var zoneRect = editable && zone.Id == draggingZoneId && liveDragRect is { } live ? live : zone.Rect;
             var rect = new Rect(zoneRect.X * w, zoneRect.Y * h, zoneRect.W * w, zoneRect.H * h);
             double cellW = rect.Width / zone.CellsW;
             double cellH = rect.Height / zone.CellsH;
 
+            dc.PushClip(new RectangleGeometry(rect, ZoneCornerRadius, ZoneCornerRadius));
             for (int cy = 0; cy < zone.CellsH; cy++)
             {
                 for (int cx = 0; cx < zone.CellsW; cx++)
@@ -114,9 +118,10 @@ public sealed class PreviewControl : FrameworkElement
                     dc.DrawRectangle(brush, null, new Rect(rect.X + cx * cellW, rect.Y + cy * cellH, cellW + 0.5, cellH + 0.5));
                 }
             }
+            dc.Pop();
 
             bool isSelected = editable && zone.Id == selectedZoneId;
-            dc.DrawRectangle(null, isSelected ? SelectedPen : OutlinePen, rect);
+            dc.DrawRoundedRectangle(null, isSelected ? SelectedPen : OutlinePen, rect, ZoneCornerRadius, ZoneCornerRadius);
 
             if (ShowLabels)
             {

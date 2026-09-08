@@ -1,3 +1,4 @@
+using System.Linq;
 using Sonolume.Engine.Core;
 using Sonolume.Engine.Effects;
 using Sonolume.Engine.Mappings;
@@ -147,7 +148,6 @@ public sealed class Compositor
     /// <summary>Advances effects and re-renders every zone. Returns true when any zone differs from what was last collected.</summary>
     public bool Update(float dt)
     {
-        bool anyDirty = false;
         foreach (var z in zones)
         {
             var p = z.Resolve();
@@ -165,8 +165,14 @@ public sealed class Compositor
             {
                 RenderIdle(z, cells, p);
             }
+        }
 
-            z.Dirty = !cells.SequenceEqual(z.LastSent);
+        ApplyBlending();
+
+        bool anyDirty = false;
+        foreach (var z in zones)
+        {
+            z.Dirty = !z.Cells.AsSpan().SequenceEqual(z.LastSent);
             anyDirty |= z.Dirty;
         }
         return anyDirty;
@@ -174,6 +180,102 @@ public sealed class Compositor
 
     private static void RenderIdle(ZoneRuntime z, Span<Rgb8> cells, in ResolvedParams p) =>
         cells.Fill(z.IsEventDriven ? Rgb8.Black : p.ZoneColor);
+
+    /// <summary>Blends each zone's own cells over any lower-ZIndex zones whose rect overlaps it, using its own
+    /// <see cref="BlendMode"/>. Weighted by actual geometric overlap per cell, so a zone that only partly overlaps
+    /// another only has its overlapping cells (or fraction of a cell) affected - the rest of the zone stays exactly
+    /// its own raw color regardless of blend mode. Zones left at the default Normal mode are untouched (they simply
+    /// occlude whatever is below them, matching pre-blending behavior), so this is a no-op unless a non-Normal blend
+    /// is configured.</summary>
+    private void ApplyBlending()
+    {
+        bool anyBlend = false;
+        foreach (var z in zones)
+        {
+            if (z.Zone.Blend != BlendMode.Normal) { anyBlend = true; break; }
+        }
+        if (!anyBlend) return;
+
+        var order = zones.OrderBy(z => z.Zone.ZIndex).ToArray();
+        for (int oi = 0; oi < order.Length; oi++)
+        {
+            var z = order[oi];
+            if (z.Zone.Blend == BlendMode.Normal) continue;
+
+            var rect = z.Zone.Rect;
+            if (rect.W <= 0 || rect.H <= 0) continue;
+            float cellW = rect.W / z.CellsW;
+            float cellH = rect.H / z.CellsH;
+            float cellArea = cellW * cellH;
+            if (cellArea <= 0f) continue;
+
+            for (int cy = 0; cy < z.CellsH; cy++)
+            {
+                for (int cx = 0; cx < z.CellsW; cx++)
+                {
+                    var cellRect = new RectF(rect.X + cx * cellW, rect.Y + cy * cellH, cellW, cellH);
+
+                    Rgb8 backdrop = Rgb8.Black;
+                    float coverage = 0f;
+                    for (int oj = 0; oj < oi; oj++)
+                    {
+                        var below = order[oj];
+                        var overlap = Intersect(cellRect, below.Zone.Rect);
+                        if (overlap.W <= 0f || overlap.H <= 0f) continue;
+
+                        float covW = Math.Clamp(overlap.W * overlap.H / cellArea, 0f, 1f);
+                        Rgb8 belowColor = AverageColor(below, overlap);
+                        Rgb8 combined = Rgb8.Blend(below.Zone.Blend, belowColor, backdrop);
+                        backdrop = Rgb8.Lerp(backdrop, combined, covW);
+                        coverage = Math.Min(1f, coverage + covW);
+                    }
+
+                    if (coverage <= 0f) continue;
+
+                    int idx = cy * z.CellsW + cx;
+                    Rgb8 raw = z.Cells[idx];
+                    Rgb8 blended = Rgb8.Blend(z.Zone.Blend, raw, backdrop);
+                    z.Cells[idx] = Rgb8.Lerp(raw, blended, coverage);
+                }
+            }
+        }
+    }
+
+    private static RectF Intersect(RectF a, RectF b)
+    {
+        float x0 = Math.Max(a.X, b.X), y0 = Math.Max(a.Y, b.Y);
+        float x1 = Math.Min(a.X + a.W, b.X + b.W), y1 = Math.Min(a.Y + a.H, b.Y + b.H);
+        return new RectF(x0, y0, x1 - x0, y1 - y0);
+    }
+
+    /// <summary>The area-weighted average color of <paramref name="z"/>'s cells that fall within <paramref name="region"/>.</summary>
+    private static Rgb8 AverageColor(ZoneRuntime z, RectF region)
+    {
+        var r = z.Zone.Rect;
+        float cellW = r.W / z.CellsW;
+        float cellH = r.H / z.CellsH;
+        if (cellW <= 0f || cellH <= 0f) return Rgb8.Black;
+
+        float totalArea = 0f, sumR = 0f, sumG = 0f, sumB = 0f;
+        for (int cy = 0; cy < z.CellsH; cy++)
+        {
+            for (int cx = 0; cx < z.CellsW; cx++)
+            {
+                var cellRect = new RectF(r.X + cx * cellW, r.Y + cy * cellH, cellW, cellH);
+                var overlap = Intersect(cellRect, region);
+                if (overlap.W <= 0f || overlap.H <= 0f) continue;
+
+                float area = overlap.W * overlap.H;
+                var c = z.Cells[cy * z.CellsW + cx];
+                sumR += c.R * area;
+                sumG += c.G * area;
+                sumB += c.B * area;
+                totalArea += area;
+            }
+        }
+        if (totalArea <= 0f) return Rgb8.Black;
+        return new Rgb8((byte)MathF.Round(sumR / totalArea), (byte)MathF.Round(sumG / totalArea), (byte)MathF.Round(sumB / totalArea));
+    }
 
     /// <summary>Returns changed regions (or all when full) and marks them as sent.</summary>
     public List<Region> Collect(bool full)
@@ -195,7 +297,7 @@ public sealed class Compositor
         for (int i = 0; i < zones.Length; i++)
         {
             var z = zones[i];
-            result[i] = new ZoneSnapshot(z.Zone.Id, z.Zone.Name, z.Zone.Rect, z.CellsW, z.CellsH, (Rgb8[])z.Cells.Clone(), z.IsEventDriven, z.Zone.Params[ParamId.EffectDecay]);
+            result[i] = new ZoneSnapshot(z.Zone.Id, z.Zone.Name, z.Zone.Rect, z.CellsW, z.CellsH, (Rgb8[])z.Cells.Clone(), z.IsEventDriven, z.Zone.Params[ParamId.EffectDecay], z.Zone.ZIndex);
         }
         return result;
     }

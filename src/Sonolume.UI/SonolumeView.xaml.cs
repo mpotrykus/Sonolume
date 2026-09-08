@@ -186,7 +186,7 @@ public partial class SonolumeView : UserControl
         GroupFieldsPanel.Visibility = Visibility.Collapsed;
         EmptyFieldsPanel.Visibility = Visibility.Visible;
         ParamsPanel.Children.Clear();
-        ParamsTitle.Text = "Params";
+        ParamsTitle.Visibility = Visibility.Collapsed;
         ParamsEmptyText.Visibility = Visibility.Visible;
         ParamsActiveCheckBox.Visibility = Visibility.Collapsed;
         ParamsActiveCheckBox.Checked -= ParamsActiveCheckBox_Changed;
@@ -274,15 +274,32 @@ public partial class SonolumeView : UserControl
 
         string zoneId = zone.Id;
         ParamsTitle.Text = zone.Name;
+        ParamsTitle.Visibility = Visibility.Visible;
         ParamsEmptyText.Visibility = Visibility.Collapsed;
         RebuildParamsPanel(ParamsPanel, zone.Params, (id, raw) => session.SetParam(TargetRef.Zone(zoneId), id, raw));
+        ParamsPanel.Children.Add(BuildParamGroup(ParamsPanel, "Layer",
+            BuildBlendRow(zone, mode => CommitZoneUpdate(zoneId, z => z.Blend = mode)),
+            BuildZIndexRow(zone, value => CommitZoneUpdate(zoneId, z => z.ZIndex = value))));
+    }
+
+    private void CommitZoneUpdate(string zoneId, Action<Zone> apply)
+    {
+        try
+        {
+            session.UpdateZone(zoneId, apply);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(OwnerWindow, ex.Message, "Update zone", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        RefreshEditor();
     }
 
     private void AddZone_Click(object sender, RoutedEventArgs e)
     {
         var project = projectSnapshot ?? session.GetProjectCopy();
         string id = Guid.NewGuid().ToString("N")[..8];
-        var zone = new Zone { Id = id, Name = $"Zone {project.Zones.Count + 1}", Rect = new(0.1f, 0.1f, 0.3f, 0.3f) };
+        var zone = new Zone { Id = id, Name = $"Zone {project.Zones.Count + 1}", Rect = new(0.1f, 0.1f, 0.3f, 0.3f), ZIndex = project.Zones.Count };
         try
         {
             session.AddZone(zone);
@@ -415,6 +432,7 @@ public partial class SonolumeView : UserControl
 
         string groupId = group.Id;
         ParamsTitle.Text = group.Name;
+        ParamsTitle.Visibility = Visibility.Visible;
         ParamsEmptyText.Visibility = Visibility.Collapsed;
         RebuildParamsPanel(ParamsPanel, group.Params, (id, raw) => session.SetParam(TargetRef.Group(groupId), id, raw));
     }
@@ -646,6 +664,48 @@ public partial class SonolumeView : UserControl
         row.Children.Add(label);
         row.Children.Add(valueText);
         row.Children.Add(slider);
+        return row;
+    }
+
+    private static UIElement BuildBlendRow(Zone zone, Action<BlendMode> onChange)
+    {
+        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var label = new TextBlock { Text = "Blend", Width = 60, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
+        var combo = new ComboBox { ItemsSource = Enum.GetValues<BlendMode>(), SelectedItem = zone.Blend };
+        combo.SelectionChanged += (_, _) =>
+        {
+            if (combo.SelectedItem is BlendMode mode) onChange(mode);
+        };
+        DockPanel.SetDock(label, Dock.Left);
+        row.Children.Add(label);
+        row.Children.Add(combo);
+        return row;
+    }
+
+    private static UIElement BuildZIndexRow(Zone zone, Action<int> onChange)
+    {
+        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
+        var label = new TextBlock { Text = "Z Index", Width = 60, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
+        var box = new TextBox { Text = zone.ZIndex.ToString(CultureInfo.InvariantCulture) };
+
+        void Commit()
+        {
+            if (int.TryParse(box.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int value) && value != zone.ZIndex)
+                onChange(value);
+        }
+
+        box.LostFocus += (_, _) => Commit();
+        box.KeyDown += (_, e) =>
+        {
+            if (e.Key != Key.Enter) return;
+            Commit();
+            e.Handled = true;
+            Keyboard.ClearFocus();
+        };
+
+        DockPanel.SetDock(label, Dock.Left);
+        row.Children.Add(label);
+        row.Children.Add(box);
         return row;
     }
 
