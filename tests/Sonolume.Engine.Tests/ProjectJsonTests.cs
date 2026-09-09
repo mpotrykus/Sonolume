@@ -45,7 +45,7 @@ public class ProjectJsonTests
         Assert.True(cc7.Transform.Invert);
         Assert.Equal(Curve.Exponential, cc7.Transform.Curve);
 
-        Assert.Contains("\"mode\": \"trigger\"", json);
+        Assert.Contains("\"mode\": \"gate\"", json);
         Assert.Contains("\"hue\": 0.62", json);
     }
 

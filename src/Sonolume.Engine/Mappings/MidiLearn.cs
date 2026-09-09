@@ -10,7 +10,7 @@ public static class MidiLearn
 {
     public static bool Accepts(LearnRequest request, in ControlEvent e) => request.Mode switch
     {
-        MappingMode.Set => e.Type == ControlEventType.Set,
+        MappingMode.Set or MappingMode.Select => e.Type == ControlEventType.Set,
         _ => e.Type == ControlEventType.Trigger,
     };
 
@@ -21,7 +21,7 @@ public static class MidiLearn
         Target = request.Target,
         Param = request.Param,
         Mode = request.Mode,
-        EffectId = request.Mode == MappingMode.Set ? null : request.EffectId,
+        EffectId = request.Mode is MappingMode.Set or MappingMode.Select ? null : request.EffectId,
         Transform = Transform.Identity,
     };
 }

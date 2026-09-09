@@ -55,24 +55,23 @@ public partial class SonolumeView : UserControl
     /// zone/group changes.</summary>
     private string pendingEffectId = SolidEffect.TypeName;
 
-    /// <summary>The effect-type combo/learn button built by <see cref="BuildEffectRow"/> for the current selection,
-    /// so <see cref="RefreshEffectKeyControls"/> can keep its item labels (which key triggers which effect) and its
-    /// current selection (a keyswitch note can change the live EffectId out from under it) in sync every tick,
-    /// the same way <see cref="paramSliders"/> does for the continuous params. Cleared on selection change/<see cref="ClearSelection"/>.</summary>
+    /// <summary>The effect-type combo built by <see cref="BuildEffectRow"/> for the current selection, so
+    /// <see cref="RefreshEffectKeyControls"/> can keep its current selection (the effect-type macro can change the
+    /// live EffectId out from under it) in sync every tick, the same way <see cref="paramSliders"/> does for the
+    /// continuous params. Cleared on selection change/<see cref="ClearSelection"/>.</summary>
     private ComboBox? liveEffectCombo;
-    private Button? liveEffectLearnButton;
     private TargetRef? liveEffectTarget;
     private Action<string>? liveEffectOnChanged;
     private bool suppressEffectCombo;
 
-    private sealed record EffectOption(string Id, string Label);
+    /// <summary>The blend combo built by <see cref="BuildBlendRow"/> for the current zone, kept live the same way
+    /// <see cref="liveEffectCombo"/> is - the blend macro can change the live <see cref="Zone.Blend"/> out from
+    /// under it. Zone-only (there is no Group.Blend); cleared on selection change/<see cref="ClearSelection"/>.</summary>
+    private ComboBox? liveBlendCombo;
+    private TargetRef? liveBlendTarget;
+    private bool suppressBlendCombo;
 
-    /// <summary>One entry in the effect-type dropdown: the base <see cref="EffectOption"/> plus whichever key is
-    /// currently bound to switch to it (a Select-mode mapping, see <see cref="BuildEffectRow"/>), if any.</summary>
-    private sealed record EffectComboItem(string Id, string Label, string? KeyLabel)
-    {
-        public string Display => KeyLabel is null ? Label : $"{Label} ({KeyLabel})";
-    }
+    private sealed record EffectOption(string Id, string Label);
 
     private static readonly EffectOption[] EffectOptions =
     [
@@ -251,6 +250,7 @@ public partial class SonolumeView : UserControl
             RefreshKeyControls(TargetRef.Zone(zone.Id), TargetKind.Zone, project, ZoneKeyText, ZoneLearnKeyButton, ZoneClearKeyButton);
             RefreshParamsLive(zone.Params);
             RefreshEffectKeyControls(TargetRef.Zone(zone.Id), project);
+            RefreshBlendKeyControls(TargetRef.Zone(zone.Id), zone.Blend);
         }
         else if (currentKind == SelectionKind.Group)
         {
@@ -273,41 +273,38 @@ public partial class SonolumeView : UserControl
     }
 
     /// <summary>Keeps the effect-type combo built by <see cref="BuildEffectRow"/> in sync every editor tick: its
-    /// item labels (which key switches to which effect) after a keyswitch is learned/cleared, and its current
-    /// selection after a keyswitch note changes the target's live EffectId out from under it. Skipped while the
-    /// dropdown is open, so this never yanks it out from under a browsing user.</summary>
+    /// current selection, after the effect-type macro changes the target's live EffectId out from under it.
+    /// Skipped while the dropdown is open, so this never yanks it out from under a browsing user.</summary>
     private void RefreshEffectKeyControls(TargetRef target, Project project)
     {
-        if (liveEffectCombo is null || liveEffectLearnButton is null || liveEffectTarget != target) return;
-
-        bool listening = session.IsPendingLearn(target, ParamId.EffectIntensity, MappingMode.Select);
-        liveEffectLearnButton.Content = listening ? "Cancel" : "Learn";
-
+        if (liveEffectCombo is null || liveEffectTarget != target) return;
         if (liveEffectCombo.IsDropDownOpen) return;
 
         string effectId = project.Mappings
             .FirstOrDefault(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate)?.EffectId ?? pendingEffectId;
-        var items = BuildEffectComboItems(target, project);
-        var selected = Array.Find(items, o => o.Id == effectId) ?? items[0];
+        var selected = Array.Find(EffectOptions, o => o.Id == effectId) ?? EffectOptions[0];
 
-        if (liveEffectCombo.ItemsSource is EffectComboItem[] existing && existing.SequenceEqual(items)
-            && Equals(liveEffectCombo.SelectedItem, selected)) return;
+        if (Equals(liveEffectCombo.SelectedItem, selected)) return;
 
         suppressEffectCombo = true;
-        liveEffectCombo.ItemsSource = items;
         liveEffectCombo.SelectedItem = selected;
         suppressEffectCombo = false;
         liveEffectOnChanged?.Invoke(selected.Id);
     }
 
-    /// <summary>The effect-type dropdown's entries for <paramref name="target"/>: each effect option plus the key
-    /// (if any) whose Select-mode mapping (see <see cref="Mappings.MappingMode.Select"/>) switches to it.</summary>
-    private static EffectComboItem[] BuildEffectComboItems(TargetRef target, Project project) =>
-        EffectOptions.Select(o =>
-        {
-            var keyswitch = project.Mappings.FirstOrDefault(m => m.Target == target && m.Mode == MappingMode.Select && m.EffectId == o.Id);
-            return new EffectComboItem(o.Id, o.Label, keyswitch is null ? null : FormatSource(keyswitch.Source.ToString()));
-        }).ToArray();
+    /// <summary>Keeps the blend combo built by <see cref="BuildBlendRow"/> in sync every editor tick, the same way
+    /// <see cref="RefreshEffectKeyControls"/> does for the effect-type combo: its current selection, after the
+    /// blend macro changes the live <see cref="Zone.Blend"/> out from under it. Skipped while the dropdown is open.</summary>
+    private void RefreshBlendKeyControls(TargetRef target, BlendMode currentBlend)
+    {
+        if (liveBlendCombo is null || liveBlendTarget != target) return;
+        if (liveBlendCombo.IsDropDownOpen) return;
+        if (Equals(liveBlendCombo.SelectedItem, currentBlend)) return;
+
+        suppressBlendCombo = true;
+        liveBlendCombo.SelectedItem = currentBlend;
+        suppressBlendCombo = false;
+    }
 
     /// <summary>Pushes the target's current param values into the sliders/color wheel built by
     /// <see cref="RebuildParamsPanel"/>, every editor tick - so a value changing from outside this view (a CC/macro
@@ -389,9 +386,10 @@ public partial class SonolumeView : UserControl
         paramSliders.Clear();
         liveColorPicker = null;
         liveEffectCombo = null;
-        liveEffectLearnButton = null;
         liveEffectTarget = null;
         liveEffectOnChanged = null;
+        liveBlendCombo = null;
+        liveBlendTarget = null;
     }
 
     // --- Selection ---
@@ -546,8 +544,8 @@ public partial class SonolumeView : UserControl
         string zoneId = zone.Id;
         ParamsTitle.Text = zone.Name;
         ParamsTitle.Visibility = Visibility.Visible;
-        RebuildParamsPanel(ParamsPanel, zone.Params, TargetRef.Zone(zoneId), project, (id, raw) => session.SetParam(TargetRef.Zone(zoneId), id, raw),
-            BuildBlendRow(zone, mode => CommitZoneUpdate(zoneId, z => z.Blend = mode)));
+        RebuildParamsPanel(ParamsPanel, zone.Params, TargetRef.Zone(zoneId), (id, raw) => session.SetParam(TargetRef.Zone(zoneId), id, raw),
+            BuildBlendRow(zone, TargetRef.Zone(zoneId), mode => CommitZoneUpdate(zoneId, z => z.Blend = mode)));
     }
 
     private void ZoneGeometryHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -726,6 +724,8 @@ public partial class SonolumeView : UserControl
         EmptyFieldsPanel.Visibility = Visibility.Collapsed;
         session.SelectedZoneId = null;
         pendingEffectId = SolidEffect.TypeName;
+        liveBlendCombo = null;
+        liveBlendTarget = null;
 
         GroupNameBox.Text = group.Name;
 
@@ -736,7 +736,7 @@ public partial class SonolumeView : UserControl
         string groupId = group.Id;
         ParamsTitle.Text = group.Name;
         ParamsTitle.Visibility = Visibility.Visible;
-        RebuildParamsPanel(ParamsPanel, group.Params, TargetRef.Group(groupId), project, (id, raw) => session.SetParam(TargetRef.Group(groupId), id, raw));
+        RebuildParamsPanel(ParamsPanel, group.Params, TargetRef.Group(groupId), (id, raw) => session.SetParam(TargetRef.Group(groupId), id, raw));
     }
 
     private void AddGroup_Click(object sender, RoutedEventArgs e)
@@ -891,13 +891,12 @@ public partial class SonolumeView : UserControl
 
     // --- Shared helpers ---
 
-    private void RebuildParamsPanel(StackPanel panel, ParamSet values, TargetRef target, Project project, Action<ParamId, float> onChange, UIElement? blendRow = null)
+    private void RebuildParamsPanel(StackPanel panel, ParamSet values, TargetRef target, Action<ParamId, float> onChange, UIElement? blendRow = null)
     {
         panel.Children.Clear();
         paramSliders.Clear();
         liveColorPicker = null;
         liveEffectCombo = null;
-        liveEffectLearnButton = null;
         liveEffectOnChanged = null;
 
         ParamsActiveCheckBox.Checked -= ParamsActiveCheckBox_Changed;
@@ -915,11 +914,11 @@ public partial class SonolumeView : UserControl
             Style = (Style)panel.FindResource("GroupBorderStyle"),
             Padding = new Thickness(12),
             Margin = new Thickness(0, 0, 0, 16),
-            Child = BuildColorSliders(values, target, project, onChange),
+            Child = BuildColorSliders(values, onChange),
         });
-        var posXRow = BuildSliderRow(ParamId.PosX, values, target, project, onChange);
-        var posYRow = BuildSliderRow(ParamId.PosY, values, target, project, onChange);
-        var effectRow = BuildEffectRow(target, project, id =>
+        var posXRow = BuildSliderRow(ParamId.PosX, values, onChange);
+        var posYRow = BuildSliderRow(ParamId.PosY, values, onChange);
+        var effectRow = BuildEffectRow(target, id =>
         {
             colorGroup.Visibility = id == RainbowEffect.TypeName ? Visibility.Collapsed : Visibility.Visible;
             var posVisibility = id is RippleEffect.TypeName or WaveEffect.TypeName ? Visibility.Visible : Visibility.Collapsed;
@@ -927,12 +926,12 @@ public partial class SonolumeView : UserControl
             posYRow.Visibility = posVisibility;
         });
 
-        var decayRow = (FrameworkElement)BuildSliderRow(ParamId.EffectDecay, values, target, project, onChange);
+        var decayRow = (FrameworkElement)BuildSliderRow(ParamId.EffectDecay, values, onChange);
         decayRow.Margin = new Thickness(decayRow.Margin.Left, decayRow.Margin.Top, decayRow.Margin.Right, 0);
 
         var modulationRows = new StackPanel();
-        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectIntensity, values, target, project, onChange));
-        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectSpeed, values, target, project, onChange));
+        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectIntensity, values, onChange));
+        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectSpeed, values, onChange));
         modulationRows.Children.Add(decayRow);
 
         var modulationGroup = new Border
@@ -953,30 +952,25 @@ public partial class SonolumeView : UserControl
         panel.Children.Add(BuildCollapsibleParamGroup(panel, "Effect", rows.ToArray()));
     }
 
-    /// <summary>Picks which effect the target's Trigger/Gate mapping uses, plus a keyswitch (Select-mode mapping,
-    /// see <see cref="MappingMode.Select"/>) that can flip it live: "Learn" arms listening for the next note and
-    /// binds it to whichever effect is currently selected in the dropdown; "Clear" removes that effect's binding.
-    /// Built fresh each time the panel is rebuilt (on selection change), like the color and blend rows, but kept
-    /// live afterward by <see cref="RefreshEffectKeyControls"/> - unlike them, a keyswitch note firing changes the
+    /// <summary>Picks which effect the target's Trigger/Gate mapping uses. Live effect-type switching is a
+    /// Select-mode mapping (see <see cref="MappingMode.Select"/>) fixed to <see cref="DefaultMacros.EffectTypeSlot"/>
+    /// (see <see cref="BuildMacroLabel"/>) the moment a zone/group is created (see
+    /// <see cref="SonolumeSession.AddZone"/>/<see cref="SonolumeSession.AddGroup"/>) so it's already live with no
+    /// setup. Built fresh each time the panel is rebuilt (on selection change), like the color and blend rows, but
+    /// kept live afterward by <see cref="RefreshEffectKeyControls"/> - unlike them, the macro firing changes the
     /// target's EffectId (and thus what this row should show) out from under it.</summary>
-    private UIElement BuildEffectRow(TargetRef target, Project project, Action<string> onEffectIdChanged)
+    private UIElement BuildEffectRow(TargetRef target, Action<string> onEffectIdChanged)
     {
         var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
         var label = new TextBlock { Text = "Type", Width = 60, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
 
-        var keyButtons = new StackPanel { Orientation = Orientation.Horizontal };
-        var learnButton = new Button { Content = "Learn", Padding = new Thickness(10, 2, 10, 2) };
-        var clearButton = new Button { Content = "Clear", Padding = new Thickness(10, 2, 10, 2), Margin = new Thickness(6, 0, 0, 0) };
-        keyButtons.Children.Add(learnButton);
-        keyButtons.Children.Add(clearButton);
+        var macroLabel = BuildMacroLabel(DefaultMacros.EffectTypeSlot);
 
-        var combo = new ComboBox { DisplayMemberPath = "Display" };
-        var items = BuildEffectComboItems(target, project);
-        combo.ItemsSource = items;
+        var combo = new ComboBox { DisplayMemberPath = "Label", ItemsSource = EffectOptions };
 
         string effectId = (projectSnapshot ?? session.GetProjectCopy()).Mappings
             .FirstOrDefault(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate)?.EffectId ?? pendingEffectId;
-        combo.SelectedItem = Array.Find(items, o => o.Id == effectId) ?? items[0];
+        combo.SelectedItem = Array.Find(EffectOptions, o => o.Id == effectId) ?? EffectOptions[0];
 
         // Idempotent (no-op once already Gate with this EffectId) - catches mappings that predate Gate becoming
         // the default (the built-in kit's kick/snare/hihat, or anything learned before that change) so hold-to-
@@ -986,36 +980,20 @@ public partial class SonolumeView : UserControl
 
         combo.SelectionChanged += (_, _) =>
         {
-            if (suppressEffectCombo) return; // a live keyswitch/relabel update, not the user picking an effect
-            if (combo.SelectedItem is not EffectComboItem option) return;
+            if (suppressEffectCombo) return; // a live macro/relabel update, not the user picking an effect
+            if (combo.SelectedItem is not EffectOption option) return;
             pendingEffectId = option.Id;
             session.SetEffect(target, option.Id);
             onEffectIdChanged(option.Id);
         };
 
-        learnButton.Click += (_, _) =>
-        {
-            if (combo.SelectedItem is not EffectComboItem option) return;
-            if (session.IsPendingLearn(target, ParamId.EffectIntensity, MappingMode.Select)) session.CancelLearn();
-            else session.BeginLearn(target, ParamId.EffectIntensity, MappingMode.Select, option.Id);
-            RefreshEditor();
-        };
-
-        clearButton.Click += (_, _) =>
-        {
-            if (combo.SelectedItem is not EffectComboItem option) return;
-            session.RemoveKeyswitch(target, option.Id);
-            RefreshEditor();
-        };
-
         DockPanel.SetDock(label, Dock.Left);
-        DockPanel.SetDock(keyButtons, Dock.Right);
+        DockPanel.SetDock(macroLabel, Dock.Right);
         row.Children.Add(label);
-        row.Children.Add(keyButtons);
+        row.Children.Add(macroLabel);
         row.Children.Add(combo);
 
         liveEffectCombo = combo;
-        liveEffectLearnButton = learnButton;
         liveEffectTarget = target;
         liveEffectOnChanged = onEffectIdChanged;
         return row;
@@ -1078,7 +1056,7 @@ public partial class SonolumeView : UserControl
         _ => id.ToString(),
     };
 
-    private UIElement BuildSliderRow(ParamId id, ParamSet values, TargetRef target, Project project, Action<ParamId, float> onChange)
+    private UIElement BuildSliderRow(ParamId id, ParamSet values, Action<ParamId, float> onChange)
     {
         var info = ParamInfos.Of(id);
         var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
@@ -1110,9 +1088,9 @@ public partial class SonolumeView : UserControl
 
         if (id is not ParamId.PaletteIndex) // no effect reads this yet - not worth mapping either
         {
-            var macroPicker = BuildMacroPicker(target, id, project);
-            DockPanel.SetDock(macroPicker, Dock.Right);
-            row.Children.Add(macroPicker);
+            var macroLabel = BuildMacroLabel(DefaultMacros.SlotFor(id));
+            DockPanel.SetDock(macroLabel, Dock.Right);
+            row.Children.Add(macroLabel);
         }
 
         DockPanel.SetDock(valueText, Dock.Right);
@@ -1123,61 +1101,49 @@ public partial class SonolumeView : UserControl
         return row;
     }
 
-    private static readonly string[] MacroOptions = BuildMacroOptions();
+    private static readonly Brush MacroLabelPillBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x38)));
 
-    private static string[] BuildMacroOptions()
+    /// <summary>Shows which host macro drives a param or select mapping - fixed by <see cref="DefaultMacros"/>,
+    /// never user-editable, so this is a plain pill badge where a picker combo used to sit. Sized to its own text
+    /// ("CC 00".."CC 09"), not a fixed width, so it takes no more of the row than it needs.</summary>
+    private static Border BuildMacroLabel(int slot) => new()
     {
-        var options = new string[SourceAddress.MacroCount + 1];
-        options[0] = "None";
-        // Zero-padded, 0-based, "CC"-prefixed to match the plugin's own parameter names (see SonolumePlugin) and
-        // the index column DAWs show in their own parameter/automation list, so a picked entry here is directly
-        // findable there without translating "Macro N" against "Param N-1".
-        for (int i = 0; i < SourceAddress.MacroCount; i++) options[i + 1] = $"CC {i:00}";
-        return options;
-    }
-
-    /// <summary>Picks which host macro parameter (if any) drives <paramref name="param"/> on
-    /// <paramref name="target"/>. Unlike MIDI Learn, this is a direct assignment - the DAW's parameter list tells
-    /// us unambiguously which macro moved, so there's nothing to "listen" for; picking a different macro (or
-    /// "None") just swaps the underlying Set-mode mapping.</summary>
-    private ComboBox BuildMacroPicker(TargetRef target, ParamId param, Project project)
-    {
-        var mapping = project.Mappings.FirstOrDefault(m =>
-            m.Target == target && m.Param == param && m.Mode == MappingMode.Set && m.Source.Kind == SourceKind.HostMacro);
-
-        var combo = new ComboBox
+        Child = new TextBlock
         {
-            ItemsSource = MacroOptions,
-            SelectedIndex = mapping is null ? 0 : mapping.Source.Number + 1,
-            Margin = new Thickness(6, 0, 0, 0),
-            VerticalAlignment = VerticalAlignment.Center,
-            Width = 70,
-            // The app-wide ComboBox style pads 20px each side, meant for wider dropdowns (Blend, Group, ...);
-            // that leaves too little room at this fixed width for "CC 00" text, so override it down just here.
-            Padding = new Thickness(8, 7, 4, 7),
-        };
-        combo.SelectionChanged += (_, _) =>
-        {
-            int selected = combo.SelectedIndex;
-            if (selected < 0 || selected == (mapping is null ? 0 : mapping.Source.Number + 1)) return;
-            session.SetMacroMapping(target, param, selected == 0 ? null : selected - 1);
-            RefreshEditor();
-        };
-        return combo;
-    }
+            Text = $"CC {slot:00}",
+            TextAlignment = TextAlignment.Center,
+            Foreground = MutedBrush,
+        },
+        Background = MacroLabelPillBrush,
+        CornerRadius = new CornerRadius(10),
+        Padding = new Thickness(8, 2, 8, 2),
+        Margin = new Thickness(6, 0, 0, 0),
+        VerticalAlignment = VerticalAlignment.Center,
+    };
 
-    private static UIElement BuildBlendRow(Zone zone, Action<BlendMode> onChange)
+    /// <summary>Picks the zone's blend mode - the CC driving live blend switching is fixed at
+    /// <see cref="DefaultMacros.BlendSlot"/> (see <see cref="BuildMacroLabel"/>), the same pairing as
+    /// <see cref="BuildEffectRow"/>'s "Type" row. Built fresh whenever the zone panel is rebuilt (see
+    /// <see cref="LoadZonePanel"/>), then kept live by <see cref="RefreshBlendKeyControls"/>.</summary>
+    private UIElement BuildBlendRow(Zone zone, TargetRef target, Action<BlendMode> onChange)
     {
         var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
         var label = new TextBlock { Text = "Blend", Width = 60, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
+        var macroLabel = BuildMacroLabel(DefaultMacros.BlendSlot);
         var combo = new ComboBox { ItemsSource = Enum.GetValues<BlendMode>(), SelectedItem = zone.Blend };
         combo.SelectionChanged += (_, _) =>
         {
+            if (suppressBlendCombo) return; // a live macro update, not the user picking a blend mode
             if (combo.SelectedItem is BlendMode mode) onChange(mode);
         };
         DockPanel.SetDock(label, Dock.Left);
+        DockPanel.SetDock(macroLabel, Dock.Right);
         row.Children.Add(label);
+        row.Children.Add(macroLabel);
         row.Children.Add(combo);
+
+        liveBlendCombo = combo;
+        liveBlendTarget = target;
         return row;
     }
 
@@ -1224,18 +1190,18 @@ public partial class SonolumeView : UserControl
     }
 
     // Sliders (not just the color wheel above) so Hue/Saturation/Brightness are directly draggable and get
-    // the same macro picker as every other continuous param, instead of only being reachable through the
+    // the same fixed CC label as every other continuous param, instead of only being reachable through the
     // wheel. The two stay in sync: RefreshOpenPanel pushes live values into both every tick (see paramSliders,
     // liveColorPicker) whenever a CC/macro or another view is what's driving the change.
-    private UIElement BuildColorSliders(ParamSet values, TargetRef target, Project project, Action<ParamId, float> onChange)
+    private UIElement BuildColorSliders(ParamSet values, Action<ParamId, float> onChange)
     {
         var stack = new StackPanel();
 
-        var brightnessRow = (FrameworkElement)BuildSliderRow(ParamId.Brightness, values, target, project, onChange);
+        var brightnessRow = (FrameworkElement)BuildSliderRow(ParamId.Brightness, values, onChange);
         brightnessRow.Margin = new Thickness(brightnessRow.Margin.Left, brightnessRow.Margin.Top, brightnessRow.Margin.Right, 0);
 
-        stack.Children.Add(BuildSliderRow(ParamId.Hue, values, target, project, onChange));
-        stack.Children.Add(BuildSliderRow(ParamId.Saturation, values, target, project, onChange));
+        stack.Children.Add(BuildSliderRow(ParamId.Hue, values, onChange));
+        stack.Children.Add(BuildSliderRow(ParamId.Saturation, values, onChange));
         stack.Children.Add(brightnessRow);
         return stack;
     }
@@ -1359,7 +1325,7 @@ public partial class SonolumeView : UserControl
         foreach (var m in mappings)
         {
             // Only the note-triggered "Key" mapping belongs here - Set-mode macro mappings (see DefaultMacros)
-            // and Select-mode keyswitch mappings (see BuildEffectRow) aren't part of this label.
+            // and Select-mode effect-type CC mappings (see BuildEffectRow) aren't part of this label.
             if (!m.Enabled || m.Target.Kind != kind || m.Mode is MappingMode.Set or MappingMode.Select) continue;
             string source = FormatSource(m.Source.ToString());
             if (labels.TryGetValue(m.Target.Id, out var existing))

@@ -177,6 +177,15 @@ public sealed class Compositor
         }
     }
 
+    /// <summary>Sets a zone's blend mode directly (there is no Group.Blend); read live by <see cref="ApplyBlending"/>
+    /// every <see cref="Update"/>, so no dirty-marking is needed here.</summary>
+    public void SetBlend(TargetRef target, BlendMode mode)
+    {
+        if (target.Kind != TargetKind.Zone) return;
+        var zone = project.FindZone(target.Id);
+        if (zone is not null) zone.Blend = mode;
+    }
+
     /// <summary>Advances effects and re-renders every zone. Returns true when any zone differs from what was last collected.
     /// <paramref name="bpm"/> is the host's tempo (0 when there is none - the standalone app always runs free-running);
     /// <paramref name="isPlaying"/> gates whether <see cref="songBeats"/> advances, so tempo-locked effects freeze

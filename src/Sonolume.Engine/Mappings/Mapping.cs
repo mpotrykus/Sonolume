@@ -11,9 +11,9 @@ public enum MappingMode
     Trigger,
     /// <summary>Gated: trigger starts the effect, release ends it.</summary>
     Gate,
-    /// <summary>Keyswitch: a trigger repoints the target's Trigger/Gate mapping(s) at this mapping's EffectId,
-    /// live (a low-octave note picks which effect the zone's key plays next, the way sample libraries switch
-    /// articulations) - it never renders anything itself.</summary>
+    /// <summary>Effect type: a continuous CC repoints the target's Trigger/Gate mapping(s) at whichever effect
+    /// its current value lands on (the registered effects divided into equal slices of 0..1, see
+    /// <see cref="Engine.Engine.SelectEffect"/>), live - it never renders anything itself.</summary>
     Select,
 }
 
@@ -41,7 +41,7 @@ public sealed class Mapping
     public TargetRef Target { get; set; } = TargetRef.Zone("");
     public ParamId Param { get; set; } = ParamId.Brightness;
     public MappingMode Mode { get; set; } = MappingMode.Set;
-    /// <summary>Effect started by Trigger/Gate mappings. Ignored for Set.</summary>
+    /// <summary>Effect started by Trigger/Gate mappings. Ignored for Set and Select.</summary>
     public string? EffectId { get; set; }
     public Transform Transform { get; set; } = Transform.Identity;
 
@@ -50,7 +50,7 @@ public sealed class Mapping
         MappingMode.Set => type == ControlEventType.Set,
         MappingMode.Trigger => type == ControlEventType.Trigger,
         MappingMode.Gate => type is ControlEventType.Trigger or ControlEventType.Release,
-        MappingMode.Select => type == ControlEventType.Trigger,
+        MappingMode.Select => type == ControlEventType.Set,
         _ => false,
     };
 }

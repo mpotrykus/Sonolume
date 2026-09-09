@@ -18,8 +18,10 @@ public readonly record struct SourceAddress(SourceKind Kind, int Channel, int Nu
 {
     public const int Any = -1;
 
-    /// <summary>Number of host-automation macro parameters the VST3 plugin exposes (see <see cref="HostMacro"/>).</summary>
-    public const int MacroCount = 8;
+    /// <summary>Number of host-automation macro parameters the VST3 plugin exposes (see <see cref="HostMacro"/>) -
+    /// effect-type (DefaultMacros.EffectTypeSlot) and blend (DefaultMacros.BlendSlot) switching plus 8 continuous
+    /// params, in the fixed top-to-bottom order the zone/group editor shows them (see DefaultMacros).</summary>
+    public const int MacroCount = 10;
 
     public bool Matches(in SourceAddress concrete) =>
         Kind == concrete.Kind

@@ -128,7 +128,8 @@ public sealed class Engine
                 else compositor.Release(m.Target);
                 break;
             case MappingMode.Select:
-                SelectEffect(m);
+                if (m.Param == ParamId.Blend) SelectBlend(m, action.Value01);
+                else SelectEffect(m, action.Value01);
                 break;
         }
     }
@@ -141,17 +142,27 @@ public sealed class Engine
         compositor.Trigger(m.Target, effectId, info);
     }
 
-    /// <summary>Keyswitch: a Select-mode mapping firing repoints every Trigger/Gate mapping on the same target at
-    /// this mapping's EffectId, live - the next hit plays the new effect. Mutates the Mapping objects
+    /// <summary>Effect-type CC: a Select-mode mapping's value repoints every Trigger/Gate mapping on the same
+    /// target at whichever registered effect that value lands on, dividing 0..1 into one equal slice per effect
+    /// (<see cref="EffectRegistry.Ids"/> order) - the next hit plays the new effect. Mutates the Mapping objects
     /// <see cref="MappingEngine"/> already holds references to (not copies), so no rebuild is needed.</summary>
-    private void SelectEffect(Mapping m)
+    private void SelectEffect(Mapping m, float value01)
     {
-        string? effectId = m.EffectId;
-        if (effectId is null || !Effects.Contains(effectId)) return;
+        var ids = Effects.Ids;
+        if (ids.Count == 0) return;
+        string effectId = ids[Math.Min((int)(value01 * ids.Count), ids.Count - 1)];
         foreach (var candidate in Project.Mappings)
             if (candidate.Target == m.Target && candidate.Mode is MappingMode.Trigger or MappingMode.Gate)
                 candidate.EffectId = effectId;
     }
+
+    private static readonly BlendMode[] BlendModes = Enum.GetValues<BlendMode>();
+
+    /// <summary>Blend CC: a Select-mode mapping's value sets the target zone's <see cref="Zone.Blend"/> directly,
+    /// dividing 0..1 into one equal slice per <see cref="BlendMode"/> value - the mirror of <see cref="SelectEffect"/>
+    /// for the "Type" macro, just writing straight to the zone instead of repointing other mappings.</summary>
+    private void SelectBlend(Mapping m, float value01) =>
+        compositor.SetBlend(m.Target, BlendModes[Math.Min((int)(value01 * BlendModes.Length), BlendModes.Length - 1)]);
 
     /// <summary>Reports the host's current tempo, if any, for tempo-locked effects. Call every tick (or every audio
     /// buffer, via <see cref="EngineRunner.SetTempo"/>); <paramref name="bpm"/> of 0 or less means "no host tempo" -

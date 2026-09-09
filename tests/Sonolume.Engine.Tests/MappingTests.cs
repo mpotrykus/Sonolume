@@ -20,7 +20,7 @@ public class MappingTests
 
         Assert.Equal(1, n);
         Assert.Equal("kick", actions[0].Mapping.Target.Id);
-        Assert.Equal(MappingMode.Trigger, actions[0].Mapping.Mode);
+        Assert.Equal(MappingMode.Gate, actions[0].Mapping.Mode);
         Assert.Equal("solid", actions[0].Mapping.EffectId);
         Assert.Equal(0.75f, actions[0].Value01, 4);
     }
@@ -36,8 +36,16 @@ public class MappingTests
     [Fact]
     public void TriggerMapping_IgnoresRelease()
     {
-        var engine = new MappingEngine(Project.CreateDefault().Mappings);
-        var e = new ControlEvent(new SourceAddress(SourceKind.MidiNote, 0, 36), ControlEventType.Release, 0f, 0);
+        var mapping = new Mapping
+        {
+            Id = "m",
+            Source = SourceAddress.Note(36),
+            Target = TargetRef.Zone("kick"),
+            Mode = MappingMode.Trigger,
+            EffectId = "solid",
+        };
+        var engine = new MappingEngine(new[] { mapping });
+        var e = new ControlEvent(SourceAddress.Note(36), ControlEventType.Release, 0f, 0);
         Assert.Equal(0, engine.Resolve(e, new MappingAction[8]));
     }
 

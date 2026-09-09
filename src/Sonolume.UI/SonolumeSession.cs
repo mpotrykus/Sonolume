@@ -1,6 +1,7 @@
 using System.Threading;
 using Sonolume.Engine;
 using Sonolume.Engine.Core;
+using Sonolume.Engine.Effects;
 using Sonolume.Engine.Input;
 using Sonolume.Engine.Mappings;
 using Sonolume.Engine.Model;
@@ -120,12 +121,35 @@ public sealed class SonolumeSession : IDisposable
     }
 
     /// <summary>Adds the zone pre-wired with the default macro-per-param convention (see <see cref="DefaultMacros"/>)
-    /// so its continuous params are controllable from the DAW's host parameters immediately, no setup needed.</summary>
+    /// so its continuous params are controllable from the DAW's host parameters immediately, no setup needed, and a
+    /// Gate "Key" mapping on the next MIDI note not already claimed by another mapping, so the zone lights up as
+    /// soon as it's added instead of sitting silent until the user manually learns a key.</summary>
     public void AddZone(Zone zone) => MutateWithUndo(e =>
     {
         e.AddZone(zone);
         foreach (var m in DefaultMacros.For(TargetRef.Zone(zone.Id))) e.AddMapping(m);
+        e.AddMapping(new Mapping
+        {
+            Id = $"key-{Guid.NewGuid():N}",
+            Source = SourceAddress.Note(NextAvailableNote(e.Project.Mappings)),
+            Target = TargetRef.Zone(zone.Id),
+            Param = ParamId.EffectIntensity,
+            Mode = MappingMode.Gate,
+            EffectId = SolidEffect.TypeName,
+            Transform = Transform.Identity,
+        });
     });
+
+    /// <summary>Lowest MIDI note (starting from C1/36, matching the default kit's kick) not already used by any
+    /// existing note mapping, regardless of target or mode - two mappings sharing a note would both fire together
+    /// whenever it plays.</summary>
+    private static int NextAvailableNote(IEnumerable<Mapping> mappings)
+    {
+        var used = new HashSet<int>(mappings.Where(m => m.Source.Kind == SourceKind.MidiNote).Select(m => m.Source.Number));
+        int note = 36;
+        while (used.Contains(note)) note++;
+        return note;
+    }
 
     public void RemoveZone(string id) => MutateWithUndo(e => e.RemoveZone(id));
 
@@ -142,7 +166,25 @@ public sealed class SonolumeSession : IDisposable
         }
     });
 
-    public void AddGroup(Group group) => MutateWithUndo(e => e.AddGroup(group));
+    /// <summary>Adds the group pre-wired with the default macro-per-param convention (see <see cref="DefaultMacros"/>),
+    /// same as <see cref="AddZone"/>, plus a Gate "Key" mapping on the next MIDI note not already claimed by another
+    /// mapping, so it lights up as soon as it's added instead of sitting silent until the user manually learns a
+    /// key.</summary>
+    public void AddGroup(Group group) => MutateWithUndo(e =>
+    {
+        e.AddGroup(group);
+        foreach (var m in DefaultMacros.For(TargetRef.Group(group.Id))) e.AddMapping(m);
+        e.AddMapping(new Mapping
+        {
+            Id = $"key-{Guid.NewGuid():N}",
+            Source = SourceAddress.Note(NextAvailableNote(e.Project.Mappings)),
+            Target = TargetRef.Group(group.Id),
+            Param = ParamId.EffectIntensity,
+            Mode = MappingMode.Gate,
+            EffectId = SolidEffect.TypeName,
+            Transform = Transform.Identity,
+        });
+    });
 
     public void RemoveGroup(string id) => MutateWithUndo(e => e.RemoveGroup(id));
 
@@ -151,8 +193,7 @@ public sealed class SonolumeSession : IDisposable
     public void RenameProject(string name) => MutateWithUndo(e => e.RenameProject(name));
 
     /// <summary>Clears <paramref name="target"/>'s note-triggered "Key" mapping(s) - Trigger/Gate only, leaving its
-    /// Set-mode macro mappings (see <see cref="DefaultMacros"/>) and Select-mode keyswitch mappings (see
-    /// <see cref="RemoveKeyswitch"/>) untouched.</summary>
+    /// fixed macro mappings (see <see cref="DefaultMacros"/>) untouched.</summary>
     public void RemoveMappingsForTarget(TargetRef target) => MutateWithUndo(e =>
     {
         var ids = e.Project.Mappings.Where(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate)
@@ -161,7 +202,7 @@ public sealed class SonolumeSession : IDisposable
     });
 
     /// <summary>Switches the effect used by <paramref name="target"/>'s Trigger/Gate mapping(s), if any exist
-    /// (Set-mode macro mappings and Select-mode keyswitch mappings ignore this and are left alone), and upgrades
+    /// (Set-mode macro mappings and the Select-mode effect-type macro mapping ignore this and are left alone), and upgrades
     /// them to Gate so the effect holds for as long as the key is down - covers mappings learned before Gate became
     /// the default, and the built-in default kit's Trigger mappings. No-op - and no undo entry - if nothing is
     /// learned yet (the effect picker's selection is then just remembered for the next <see cref="BeginLearn"/>) or
@@ -184,16 +225,6 @@ public sealed class SonolumeSession : IDisposable
         });
     }
 
-    /// <summary>Removes <paramref name="target"/>'s keyswitch note for <paramref name="effectId"/>, if one is
-    /// bound (see <see cref="BeginLearn"/> with <see cref="MappingMode.Select"/>) - lets the user re-learn a
-    /// different key for that effect instead of stacking a second note on top of the old one.</summary>
-    public void RemoveKeyswitch(TargetRef target, string effectId) => MutateWithUndo(e =>
-    {
-        var ids = e.Project.Mappings.Where(m => m.Target == target && m.Mode == MappingMode.Select && m.EffectId == effectId)
-            .Select(m => m.Id).ToList();
-        foreach (var id in ids) e.RemoveMapping(id);
-    });
-
     /// <summary>Arms the engine to turn the next matching MIDI event into a mapping targeting
     /// <paramref name="target"/>. Not undoable itself; <see cref="PollLearn"/> folds the result in once it lands.</summary>
     public void BeginLearn(TargetRef target, ParamId param, MappingMode mode, string? effectId = null)
@@ -209,30 +240,6 @@ public sealed class SonolumeSession : IDisposable
         PendingLearn = null;
         learnBeforeSnapshot = null;
     }
-
-    /// <summary>Points <paramref name="param"/> on <paramref name="target"/> at host macro <paramref name="macroIndex"/>
-    /// (0-based), replacing whatever Set-mode mapping was there before; <c>null</c> clears it entirely. Unlike MIDI
-    /// Learn, this never needs to "listen" - the host tells us exactly which parameter changed, so a direct pick is
-    /// enough.</summary>
-    public void SetMacroMapping(TargetRef target, ParamId param, int? macroIndex) => MutateWithUndo(e =>
-    {
-        var stale = e.Project.Mappings.Where(m => m.Target == target && m.Param == param && m.Mode == MappingMode.Set)
-            .Select(m => m.Id).ToList();
-        foreach (var id in stale) e.RemoveMapping(id);
-
-        if (macroIndex is { } idx)
-        {
-            e.AddMapping(new Mapping
-            {
-                Id = $"macro-{Guid.NewGuid():N}",
-                Source = SourceAddress.HostMacro(idx),
-                Target = target,
-                Param = param,
-                Mode = MappingMode.Set,
-                Transform = Transform.Identity,
-            });
-        }
-    });
 
     private long macroEventsReceived;
 

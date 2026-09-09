@@ -4,10 +4,17 @@ namespace Sonolume.Engine.Effects;
 public sealed class EffectRegistry
 {
     private readonly Dictionary<string, Func<IEffect>> factories = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<string> order = new();
 
-    public IReadOnlyCollection<string> Ids => factories.Keys;
+    /// <summary>Registration order - the effect-type CC (see Engine.SelectEffect) quantizes its 0..1 value into
+    /// an index into this list, so it must stay stable rather than following Dictionary's unordered Keys.</summary>
+    public IReadOnlyList<string> Ids => order;
 
-    public void Register(string typeId, Func<IEffect> factory) => factories[typeId] = factory;
+    public void Register(string typeId, Func<IEffect> factory)
+    {
+        if (!factories.ContainsKey(typeId)) order.Add(typeId);
+        factories[typeId] = factory;
+    }
 
     public bool Contains(string typeId) => factories.ContainsKey(typeId);
 

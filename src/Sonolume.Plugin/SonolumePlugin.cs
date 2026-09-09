@@ -41,19 +41,18 @@ public sealed class SonolumePlugin : AudioPluginWPF
         OutputPorts = [output = new DoubleAudioIOPort("Silent Output", EAudioChannelConfiguration.Stereo)];
 
         // Host-automatable macros: labeled parameters every DAW shows immediately, no MIDI Learn needed. Which
-        // zone/group param each one drives is picked from Sonolume's own UI (see DefaultMacros for the starting
-        // convention every new zone gets). IDs "macro1".."macroN" are parsed back out in HandleParameterChange.
+        // zone/group param each one drives is fixed (see DefaultMacros) - every zone/group uses the same
+        // convention, so this label always describes it. IDs "macro1".."macroN" are parsed back out in
+        // HandleParameterChange.
         for (int i = 0; i < SourceAddress.MacroCount; i++)
         {
+            // 0-based index (matching the CC label the zone/group editor shows next to each row) plus the param
+            // this slot drives (DefaultMacros.LabelFor), e.g. "CC 02 Hue".
+            string label = DefaultMacros.LabelFor(i);
             var parameter = new AudioPluginParameter
             {
                 ID = $"macro{i + 1}",
-                // 0-based index (matching Sonolume's own macro picker - see BuildMacroOptions) plus the param this
-                // slot drives by DEFAULT convention (DefaultMacros.Convention), e.g. "CC 00 Brightness". This is a
-                // static label baked in at declare time, not a live one: AudioPlugSharp has no API to rename a
-                // parameter after the host has seen it, so if a zone gets repointed to a different macro via the
-                // picker, this label no longer describes it - Sonolume's own UI is the source of truth for that.
-                Name = $"CC {i:00} {DefaultMacros.Convention[i]}",
+                Name = $"CC {i:00} {label}",
                 MinValue = 0,
                 MaxValue = 1,
                 DefaultValue = 0,

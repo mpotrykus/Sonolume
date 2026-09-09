@@ -192,7 +192,7 @@ public sealed class PreviewControl : FrameworkElement
         foreach (var m in snapshot.Mappings)
         {
             // Only the note-triggered "Key" mapping belongs on the canvas label - Set-mode macro mappings (see
-            // DefaultMacros) and Select-mode keyswitch mappings (see SonolumeView.BuildEffectRow) aren't part of it.
+            // DefaultMacros) and Select-mode effect-type CC mappings (see SonolumeView.BuildEffectRow) aren't part of it.
             if (!m.Enabled || !m.Target.StartsWith("Zone ", StringComparison.Ordinal) || m.Mode is "Set" or "Select") continue;
             string zoneId = m.Target["Zone ".Length..];
             string source = FormatSource(m.Source);

@@ -381,29 +381,30 @@ public class EngineTests
         Assert.Equal(0, c.B);
     }
 
-    /// <summary>Exercises the keyswitch pipeline: a Select-mode mapping firing (a note bound to a specific effect,
-    /// see SonolumeView.BuildEffectRow's "Learn" button) repoints the target's Trigger mapping's EffectId live, so
-    /// the *next* trigger plays the newly selected effect - independent of any UI, and independent of whether the
-    /// keyswitch note arrives before or after the zone's own "Key" mapping is ever hit.</summary>
+    /// <summary>Exercises the effect-type CC pipeline: a Select-mode mapping firing (a CC bound to the target,
+    /// see SonolumeView.BuildEffectRow's "Learn" button) repoints the target's Trigger mapping's EffectId at
+    /// whichever registered effect the CC's value lands on, live, so the *next* trigger plays it - independent
+    /// of any UI, and independent of whether the CC move arrives before or after the zone's own "Key" mapping is
+    /// ever hit. The default registry order is solid, flash, wave, pulse, strobe, chase, ripple, sparkle, rainbow
+    /// (see EffectRegistry.CreateDefault), so 0.15 (index 1 of 9) lands on "flash".</summary>
     [Fact]
-    public void SelectMode_KeyswitchNote_RepointsTriggerMappingsEffectId()
+    public void SelectMode_CCMove_RepointsTriggerMappingsEffectId()
     {
         var project = MakeEffectProject("solid");
         project.Mappings.Add(new Mapping
         {
-            Id = "keyswitch-flash",
-            Source = SourceAddress.Note(24),
+            Id = "effect-type-cc",
+            Source = SourceAddress.CC(21),
             Target = TargetRef.Zone("strip"),
             Param = ParamId.EffectIntensity,
             Mode = MappingMode.Select,
-            EffectId = "flash",
             Transform = Transform.Identity,
         });
 
         var engine = new Engine(project, instanceId: "select001");
         Assert.Equal("solid", engine.Snapshot().Mappings.Single(m => m.Id == "effect-map").Effect);
 
-        engine.PushControl(new ControlEvent(SourceAddress.Note(24), ControlEventType.Trigger, 1f, 0));
+        engine.PushControl(new ControlEvent(SourceAddress.CC(21), ControlEventType.Set, 0.15f, 0));
 
         Assert.Equal("flash", engine.Snapshot().Mappings.Single(m => m.Id == "effect-map").Effect);
     }

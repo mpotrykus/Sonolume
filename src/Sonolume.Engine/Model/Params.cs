@@ -12,6 +12,10 @@ public enum ParamId
     PosX,
     PosY,
     PaletteIndex,
+    /// <summary>Not a real param - only used to tag a Select-mode mapping as blend-select (see
+    /// <see cref="Mappings.MappingMode.Select"/> and <see cref="Engine.Engine.SelectBlend"/>), the same way
+    /// <see cref="EffectIntensity"/> tags the effect-type select. Never read through <see cref="ParamSet"/>.</summary>
+    Blend,
 }
 
 /// <summary>Raw range and default of a parameter. Mappings write normalized 0..1 values that are denormalized into this range.</summary>
@@ -57,6 +61,7 @@ public static class ParamInfos
                 ParamId.PosX => new(id, 0f, 1f, 0.5f, ""),
                 ParamId.PosY => new(id, 0f, 1f, 0.5f, ""),
                 ParamId.PaletteIndex => new(id, 0f, 1f, 0f, ""),
+                ParamId.Blend => new(id, 0f, 1f, 0f, ""),
                 _ => throw new InvalidOperationException($"No ParamInfo for {id}"),
             };
         }

@@ -22,6 +22,37 @@ public class SonolumeSessionTests
     }
 
     [Fact]
+    public void AddZone_AutoAssignsNextAvailableKey()
+    {
+        using var session = NewSession();
+
+        session.AddZone(new Zone { Id = "new1", Name = "New 1" });
+        session.AddZone(new Zone { Id = "new2", Name = "New 2" });
+
+        var mappings = session.GetProjectCopy().Mappings;
+        var key1 = mappings.Single(m => m.Target == TargetRef.Zone("new1") && m.Mode == MappingMode.Gate);
+        var key2 = mappings.Single(m => m.Target == TargetRef.Zone("new2") && m.Mode == MappingMode.Gate);
+
+        // Default kit already claims notes 36 (kick), 38 (snare), 42 (hihat), 49 (drums group).
+        Assert.Equal(37, key1.Source.Number);
+        Assert.Equal(39, key2.Source.Number);
+    }
+
+    [Fact]
+    public void AddGroup_AutoAssignsNextAvailableKey()
+    {
+        using var session = NewSession();
+
+        session.AddGroup(new Group { Id = "newgroup", Name = "New Group" });
+
+        var mappings = session.GetProjectCopy().Mappings;
+        var key = mappings.Single(m => m.Target == TargetRef.Group("newgroup") && m.Mode == MappingMode.Gate);
+
+        // Default kit already claims notes 36 (kick), 38 (snare), 42 (hihat), 49 (drums group).
+        Assert.Equal(37, key.Source.Number);
+    }
+
+    [Fact]
     public void Redo_AfterUndo_ReappliesChange()
     {
         using var session = NewSession();
@@ -89,10 +120,19 @@ public class SonolumeSessionTests
         Assert.False(session.CanUndo);
     }
 
+    /// <summary>Builds a session on a default-kit project whose "kick" mapping is still Trigger-mode, simulating
+    /// one learned before Gate became the default (see <see cref="SonolumeSession.SetEffect"/>).</summary>
+    private static SonolumeSession NewSessionWithTriggerKick()
+    {
+        var project = Project.CreateDefault();
+        project.Mappings.Single(m => m.Target == TargetRef.Zone("kick") && m.Mode == MappingMode.Gate).Mode = MappingMode.Trigger;
+        return new SonolumeSession(project);
+    }
+
     [Fact]
     public void SetEffect_UpgradesDefaultKitTriggerMappingToGate()
     {
-        using var session = NewSession();
+        using var session = NewSessionWithTriggerKick();
         var kick = session.GetProjectCopy().Mappings.Single(m => m.Target == TargetRef.Zone("kick") && m.Mode is MappingMode.Trigger or MappingMode.Gate);
         Assert.Equal(MappingMode.Trigger, kick.Mode);
 
@@ -106,7 +146,7 @@ public class SonolumeSessionTests
     [Fact]
     public void SetEffect_CalledAgainWithSameValue_DoesNotPushASecondUndoEntry()
     {
-        using var session = NewSession();
+        using var session = NewSessionWithTriggerKick();
         session.SetEffect(TargetRef.Zone("kick"), "flash");
         session.SetEffect(TargetRef.Zone("kick"), "flash"); // already Gate + "flash" - should be a no-op
 
