@@ -12,8 +12,8 @@ namespace Sonolume.UI;
 /// </summary>
 public sealed class VirtualKeyboardControl : FrameworkElement
 {
-    private const int BaseLowNote = 48; // C3
-    private const int BaseHighNote = 72; // C5
+    private const int BaseLowNote = 36; // C2
+    private const int BaseHighNote = 60; // C4
     private const int MinNote = 0;
     private const int MaxNote = 127;
     private const double BlackKeyWidthFactor = 0.55;

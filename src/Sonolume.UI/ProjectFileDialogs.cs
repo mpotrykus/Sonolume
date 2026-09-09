@@ -18,7 +18,7 @@ public static class ProjectFileDialogs
         }
         catch (Exception ex)
         {
-            MessageBox.Show(owner, ex.Message, "Open project", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(owner, ex.Message, "Open project");
         }
     }
 
@@ -40,7 +40,7 @@ public static class ProjectFileDialogs
         }
         catch (Exception ex)
         {
-            MessageBox.Show(owner, ex.Message, "Save project", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(owner, ex.Message, "Save project");
         }
     }
 
@@ -57,7 +57,7 @@ public static class ProjectFileDialogs
         }
         catch (Exception ex)
         {
-            MessageBox.Show(owner, ex.Message, "Save project", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(owner, ex.Message, "Save project");
         }
     }
 }

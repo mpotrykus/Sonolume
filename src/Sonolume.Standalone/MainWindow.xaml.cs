@@ -103,7 +103,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            MessageBox.Show(this, $"Could not open '{name}':\n{ex.Message}", "MIDI input", MessageBoxButton.OK, MessageBoxImage.Warning);
+            AppDialog.ShowMessage(this, $"Could not open '{name}':\n{ex.Message}", "MIDI input");
         }
     }
 

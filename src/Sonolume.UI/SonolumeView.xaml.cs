@@ -469,7 +469,7 @@ public partial class SonolumeView : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show(OwnerWindow, ex.Message, "Reorder zones", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(OwnerWindow, ex.Message, "Reorder zones");
         }
         RefreshEditor();
     }
@@ -599,7 +599,7 @@ public partial class SonolumeView : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show(OwnerWindow, ex.Message, "Update zone", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(OwnerWindow, ex.Message, "Update zone");
         }
         RefreshEditor();
     }
@@ -615,7 +615,7 @@ public partial class SonolumeView : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show(OwnerWindow, ex.Message, "Add zone", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(OwnerWindow, ex.Message, "Add zone");
             return;
         }
         RefreshEditor();
@@ -631,7 +631,7 @@ public partial class SonolumeView : UserControl
 
         int mappingCount = project.Mappings.Count(m => m.Target.Kind == TargetKind.Zone && m.Target.Id == zone.Id);
         string impact = mappingCount > 0 ? $"\n\nThis will also remove {mappingCount} mapping(s) that target it." : "";
-        if (MessageBox.Show(OwnerWindow, $"Delete zone '{zone.Name}'?{impact}", "Delete zone", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (!AppDialog.ShowConfirm(OwnerWindow, $"Delete zone '{zone.Name}'?{impact}", "Delete zone", confirmText: "Delete", destructive: true)) return;
 
         session.RemoveZone(zone.Id);
         ClearSelection();
@@ -683,7 +683,7 @@ public partial class SonolumeView : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show(OwnerWindow, ex.Message, "Update zone", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(OwnerWindow, ex.Message, "Update zone");
         }
         RefreshEditor();
     }
@@ -703,7 +703,7 @@ public partial class SonolumeView : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show(OwnerWindow, ex.Message, "Update zone", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(OwnerWindow, ex.Message, "Update zone");
         }
         RefreshEditor();
     }
@@ -722,7 +722,7 @@ public partial class SonolumeView : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show(OwnerWindow, ex.Message, "Update zone", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(OwnerWindow, ex.Message, "Update zone");
         }
         RefreshEditor();
     }
@@ -763,7 +763,7 @@ public partial class SonolumeView : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show(OwnerWindow, ex.Message, "Add group", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(OwnerWindow, ex.Message, "Add group");
             return;
         }
         RefreshEditor();
@@ -786,7 +786,7 @@ public partial class SonolumeView : UserControl
         if (mappingCount > 0) parts.Add($"{mappingCount} mapping(s) will be removed");
         string impact = parts.Count > 0 ? "\n\n" + string.Join("; ", parts) + "." : "";
 
-        if (MessageBox.Show(OwnerWindow, $"Delete group '{group.Name}'?{impact}", "Delete group", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (!AppDialog.ShowConfirm(OwnerWindow, $"Delete group '{group.Name}'?{impact}", "Delete group", confirmText: "Delete", destructive: true)) return;
 
         session.RemoveGroup(group.Id);
         ClearSelection();
@@ -819,7 +819,7 @@ public partial class SonolumeView : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show(OwnerWindow, ex.Message, "Update group", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(OwnerWindow, ex.Message, "Update group");
         }
         RefreshEditor();
     }
@@ -838,7 +838,7 @@ public partial class SonolumeView : UserControl
         }
         catch (Exception ex)
         {
-            MessageBox.Show(OwnerWindow, ex.Message, "Update group", MessageBoxButton.OK, MessageBoxImage.Error);
+            AppDialog.ShowMessage(OwnerWindow, ex.Message, "Update group");
         }
         RefreshEditor();
     }
@@ -865,7 +865,7 @@ public partial class SonolumeView : UserControl
 
     private void New_Click(object sender, RoutedEventArgs e)
     {
-        if (MessageBox.Show(OwnerWindow, "Start a new empty project? Any unsaved changes will be lost.", "New project", MessageBoxButton.YesNo, MessageBoxImage.Warning) != MessageBoxResult.Yes) return;
+        if (!AppDialog.ShowConfirm(OwnerWindow, "Start a new empty project? Any unsaved changes will be lost.", "New project", confirmText: "Start New", destructive: true)) return;
         session.NewProject("Untitled");
         ClearSelection();
         RefreshEditor();
@@ -939,13 +939,15 @@ public partial class SonolumeView : UserControl
             posYRow.Visibility = posVisibility;
         });
 
-        var decayRow = (FrameworkElement)BuildSliderRow(ParamId.EffectDecay, values, onChange);
-        decayRow.Margin = new Thickness(decayRow.Margin.Left, decayRow.Margin.Top, decayRow.Margin.Right, 0);
+        var posYRowElement = (FrameworkElement)posYRow;
+        posYRowElement.Margin = new Thickness(posYRowElement.Margin.Left, posYRowElement.Margin.Top, posYRowElement.Margin.Right, 0);
 
         var modulationRows = new StackPanel();
         modulationRows.Children.Add(BuildSliderRow(ParamId.EffectIntensity, values, onChange));
         modulationRows.Children.Add(BuildSliderRow(ParamId.EffectSpeed, values, onChange));
-        modulationRows.Children.Add(decayRow);
+        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectDecay, values, onChange));
+        modulationRows.Children.Add(posXRow);
+        modulationRows.Children.Add(posYRow);
 
         var modulationGroup = new Border
         {
@@ -959,8 +961,6 @@ public partial class SonolumeView : UserControl
         if (blendRow is not null) rows.Add(blendRow);
         rows.Add(colorGroup);
         rows.Add(modulationGroup);
-        rows.Add(posXRow);
-        rows.Add(posYRow);
 
         panel.Children.Add(BuildCollapsibleParamGroup(panel, "Effect", rows.ToArray()));
     }
