@@ -12,16 +12,20 @@ All messages start with a kind letter and the protocol version. The effect paint
 
 | Message | Format | When |
 |---|---|---|
-| Layout | `L1|{"v":1,"inst":"<8 hex>","name":"<project>","zones":[{"i":0,"id":"kick","name":"Kick","x":0.04,"y":0.56,"w":0.28,"h":0.38,"cw":1,"ch":1}, ...]}` | On start, on project load, every 10 s |
-| State | `S1|<inst>|<seq>|<zoneIndex>:<WW><HH><rrggbb>...;<zoneIndex>:...` | Whenever a zone changed (dirty only), plus a full frame every 1 s as heartbeat |
-| Clear | `C1|<inst>` | On plugin/standalone shutdown |
+| Layout | `L2|<inst>|<name>|<zoneIndex>:<id>:<name>:<x>:<y>:<w>:<h>:<cw>:<ch>:<rot>;...` | On start, on project load, every 10 s |
+| State | `S2|<inst>|<seq>|<zoneIndex>:<WW><HH><rrggbb>...;<zoneIndex>:...` | Whenever a zone changed (dirty only), plus a full frame every 1 s as heartbeat |
+| Clear | `C2|<inst>` | On plugin/standalone shutdown |
+
+Delimited, not JSON: SignalRGB rewrites braces and quotes on the way into the effect.
 
 - `inst` is a per-process-instance id. The effect follows the instance that sent the most recent layout and ignores state from others.
 - `seq` increases per frame; older or duplicate sequence numbers are ignored.
+- `x`/`y`/`w`/`h` are 0..1 fractions of the SignalRGB canvas; `cw`/`ch` are the zone's cell grid.
+- `rot` is the zone's clockwise rotation in degrees, applied by the renderer to the whole rect (position, cells,
+  outline) as a rigid transform around its center - it does not change which cell holds which color.
 - `WW`/`HH` are the cell grid of the region in hex (`0101` for a solid zone). Cells are row-major `rrggbb` hex.
-- Coordinates are 0..1 fractions of the SignalRGB canvas.
 
-Example single kick hit at full velocity: `S1|a1b2c3d4|17|0:0101FF0000`
+Example single kick hit at full velocity: `S2|a1b2c3d4|17|0:0101FF0000`
 
 ## Effect-side behavior (`signalrgb-effect/`)
 

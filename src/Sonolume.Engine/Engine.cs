@@ -172,7 +172,7 @@ public sealed class Engine
         for (int i = 0; i < zones.Length; i++)
         {
             var z = Project.Zones[i];
-            zones[i] = new LayoutZone(i, z.Id, z.Name, z.Rect, Math.Max(1, z.CellsW), Math.Max(1, z.CellsH));
+            zones[i] = new LayoutZone(i, z.Id, z.Name, z.Rect, Math.Max(1, z.CellsW), Math.Max(1, z.CellsH), z.Rotation);
         }
         return new Layout(InstanceId, Project.Name, zones);
     }

@@ -12,6 +12,9 @@ public sealed class Zone
     public int CellsH { get; set; } = 1;
     public bool InvertX { get; set; }
     public bool InvertY { get; set; }
+    /// <summary>Clockwise rotation of the zone's rendered content, in degrees. Any value is allowed; angles that
+    /// aren't a multiple of 90 are bilinear-sampled, and content rotated past the zone's edge is filled black.</summary>
+    public float Rotation { get; set; }
     public string? GroupId { get; set; }
     /// <summary>Stacking order among overlapping zones; higher draws on top. Ties break by list order.</summary>
     public int ZIndex { get; set; }
@@ -28,6 +31,7 @@ public sealed class Zone
         CellsH = CellsH,
         InvertX = InvertX,
         InvertY = InvertY,
+        Rotation = Rotation,
         GroupId = GroupId,
         ZIndex = ZIndex,
         Blend = Blend,

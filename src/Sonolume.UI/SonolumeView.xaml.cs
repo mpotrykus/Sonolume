@@ -97,6 +97,7 @@ public partial class SonolumeView : UserControl
         Preview.Editable = true;
         Preview.ZoneClicked += id => session.SelectedZoneId = id;
         Preview.ZoneRectCommitted += CommitZoneRect;
+        Preview.ZoneRotationCommitted += CommitZoneRotation;
 
         VirtualKeyboard.NoteOn += note => session.Enqueue(MidiEvent.NoteOn(0, note, VirtualKeyboardVelocity, Clock.Now()));
         VirtualKeyboard.NoteOff += note => session.Enqueue(MidiEvent.NoteOff(0, note, 0f, Clock.Now()));
@@ -119,6 +120,18 @@ public partial class SonolumeView : UserControl
         try
         {
             session.UpdateZone(id, z => z.Rect = rect);
+        }
+        catch (InvalidDataException)
+        {
+            // The zone was deleted (e.g. via the zone list) while the drag was in flight; nothing to update.
+        }
+    }
+
+    private void CommitZoneRotation(string id, float rotation)
+    {
+        try
+        {
+            session.UpdateZone(id, z => z.Rotation = rotation);
         }
         catch (InvalidDataException)
         {
@@ -225,6 +238,7 @@ public partial class SonolumeView : UserControl
             SetIfNotFocused(ZoneWBox, FmtPercent(zone.Rect.W));
             SetIfNotFocused(ZoneHBox, FmtPercent(zone.Rect.H));
             SetIfNotFocused(ZoneCellsWBox, zone.CellsW.ToString());
+            SetIfNotFocused(ZoneRotationBox, Fmt(zone.Rotation));
             SetIfNotFocused(ZoneCellsHBox, zone.CellsH.ToString());
 
             if (!ZoneGroupCombo.IsDropDownOpen)
@@ -523,6 +537,7 @@ public partial class SonolumeView : UserControl
         ZoneHBox.Text = FmtPercent(zone.Rect.H);
         ZoneCellsWBox.Text = zone.CellsW.ToString();
         ZoneCellsHBox.Text = zone.CellsH.ToString();
+        ZoneRotationBox.Text = Fmt(zone.Rotation);
 
         suppressCombo = true;
         SetGroupCombo(ZoneGroupCombo, project, zone.GroupId, excludeId: null);
@@ -634,11 +649,13 @@ public partial class SonolumeView : UserControl
         float h = ParsePercentOr(ZoneHBox.Text, zone.Rect.H);
         int cellsW = Math.Max(1, ParseIntOr(ZoneCellsWBox.Text, zone.CellsW));
         int cellsH = Math.Max(1, ParseIntOr(ZoneCellsHBox.Text, zone.CellsH));
+        float rotation = ParseOr(ZoneRotationBox.Text, zone.Rotation);
         string name = ZoneNameBox.Text;
 
         bool changed = name != zone.Name || cellsW != zone.CellsW || cellsH != zone.CellsH
             || !Approximately(x, zone.Rect.X) || !Approximately(y, zone.Rect.Y)
-            || !Approximately(w, zone.Rect.W) || !Approximately(h, zone.Rect.H);
+            || !Approximately(w, zone.Rect.W) || !Approximately(h, zone.Rect.H)
+            || !Approximately(rotation, zone.Rotation);
         if (!changed) return;
 
         string id = currentId;
@@ -650,6 +667,7 @@ public partial class SonolumeView : UserControl
                 z.Rect = new(x, y, w, h);
                 z.CellsW = cellsW;
                 z.CellsH = cellsH;
+                z.Rotation = rotation;
             });
         }
         catch (Exception ex)
@@ -890,25 +908,47 @@ public partial class SonolumeView : UserControl
         ParamsActiveCheckBox.Unchecked += ParamsActiveCheckBox_Changed;
         ParamsActiveCheckBox.Visibility = Visibility.Visible;
 
-        var colorRow = BuildColorRow(values, target, project, onChange);
+        var colorGroup = new StackPanel();
+        colorGroup.Children.Add(BuildColorWheel(values, onChange));
+        colorGroup.Children.Add(new Border
+        {
+            Style = (Style)panel.FindResource("GroupBorderStyle"),
+            Padding = new Thickness(12),
+            Margin = new Thickness(0, 0, 0, 16),
+            Child = BuildColorSliders(values, target, project, onChange),
+        });
         var posXRow = BuildSliderRow(ParamId.PosX, values, target, project, onChange);
         var posYRow = BuildSliderRow(ParamId.PosY, values, target, project, onChange);
         var effectRow = BuildEffectRow(target, project, id =>
         {
-            colorRow.Visibility = id == RainbowEffect.TypeName ? Visibility.Collapsed : Visibility.Visible;
+            colorGroup.Visibility = id == RainbowEffect.TypeName ? Visibility.Collapsed : Visibility.Visible;
             var posVisibility = id is RippleEffect.TypeName or WaveEffect.TypeName ? Visibility.Visible : Visibility.Collapsed;
             posXRow.Visibility = posVisibility;
             posYRow.Visibility = posVisibility;
         });
 
+        var decayRow = (FrameworkElement)BuildSliderRow(ParamId.EffectDecay, values, target, project, onChange);
+        decayRow.Margin = new Thickness(decayRow.Margin.Left, decayRow.Margin.Top, decayRow.Margin.Right, 0);
+
+        var modulationRows = new StackPanel();
+        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectIntensity, values, target, project, onChange));
+        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectSpeed, values, target, project, onChange));
+        modulationRows.Children.Add(decayRow);
+
+        var modulationGroup = new Border
+        {
+            Style = (Style)panel.FindResource("GroupBorderStyle"),
+            Padding = new Thickness(12),
+            Margin = new Thickness(0, 0, 0, 16),
+            Child = modulationRows,
+        };
+
         var rows = new List<UIElement> { effectRow };
         if (blendRow is not null) rows.Add(blendRow);
-        rows.Add(colorRow);
-        rows.Add(BuildSliderRow(ParamId.EffectIntensity, values, target, project, onChange));
-        rows.Add(BuildSliderRow(ParamId.EffectSpeed, values, target, project, onChange));
+        rows.Add(colorGroup);
+        rows.Add(modulationGroup);
         rows.Add(posXRow);
         rows.Add(posYRow);
-        rows.Add(BuildSliderRow(ParamId.EffectDecay, values, target, project, onChange));
 
         panel.Children.Add(BuildCollapsibleParamGroup(panel, "Effect", rows.ToArray()));
     }
@@ -1144,10 +1184,8 @@ public partial class SonolumeView : UserControl
     private void ParamsActiveCheckBox_Changed(object sender, RoutedEventArgs e) =>
         paramsActiveOnChange?.Invoke(ParamId.Active, ParamsActiveCheckBox.IsChecked == true ? 1f : 0f);
 
-    private UIElement BuildColorRow(ParamSet values, TargetRef target, Project project, Action<ParamId, float> onChange)
+    private UIElement BuildColorWheel(ParamSet values, Action<ParamId, float> onChange)
     {
-        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 28) };
-
         var picker = new ColorPickerControl { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         picker.SetColor(values[ParamId.Hue], values[ParamId.Saturation], values[ParamId.Brightness]);
 
@@ -1156,7 +1194,7 @@ public partial class SonolumeView : UserControl
         var constraint = new Grid { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         constraint.Children.Add(picker);
 
-        var host = new Grid { Margin = new Thickness(0, 20, 0, 20) };
+        var host = new Grid { Margin = new Thickness(0, 4, 0, 16) };
         host.Children.Add(backdrop);
         host.Children.Add(constraint);
 
@@ -1173,7 +1211,6 @@ public partial class SonolumeView : UserControl
             constraint.Width = inner;
             constraint.Height = inner;
         };
-        stack.Children.Add(host);
 
         picker.ColorChanged += (h, s, b) =>
         {
@@ -1183,13 +1220,23 @@ public partial class SonolumeView : UserControl
         };
         liveColorPicker = picker;
 
-        // Sliders (not just the color wheel above) so Hue/Saturation/Brightness are directly draggable and get
-        // the same macro picker as every other continuous param, instead of only being reachable through the
-        // wheel. The two stay in sync: RefreshOpenPanel pushes live values into both every tick (see paramSliders,
-        // liveColorPicker) whenever a CC/macro or another view is what's driving the change.
+        return host;
+    }
+
+    // Sliders (not just the color wheel above) so Hue/Saturation/Brightness are directly draggable and get
+    // the same macro picker as every other continuous param, instead of only being reachable through the
+    // wheel. The two stay in sync: RefreshOpenPanel pushes live values into both every tick (see paramSliders,
+    // liveColorPicker) whenever a CC/macro or another view is what's driving the change.
+    private UIElement BuildColorSliders(ParamSet values, TargetRef target, Project project, Action<ParamId, float> onChange)
+    {
+        var stack = new StackPanel();
+
+        var brightnessRow = (FrameworkElement)BuildSliderRow(ParamId.Brightness, values, target, project, onChange);
+        brightnessRow.Margin = new Thickness(brightnessRow.Margin.Left, brightnessRow.Margin.Top, brightnessRow.Margin.Right, 0);
+
         stack.Children.Add(BuildSliderRow(ParamId.Hue, values, target, project, onChange));
         stack.Children.Add(BuildSliderRow(ParamId.Saturation, values, target, project, onChange));
-        stack.Children.Add(BuildSliderRow(ParamId.Brightness, values, target, project, onChange));
+        stack.Children.Add(brightnessRow);
         return stack;
     }
 

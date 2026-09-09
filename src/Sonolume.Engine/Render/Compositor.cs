@@ -371,7 +371,7 @@ public sealed class Compositor
         for (int i = 0; i < zones.Length; i++)
         {
             var z = zones[i];
-            result[i] = new ZoneSnapshot(z.Zone.Id, z.Zone.Name, z.Zone.Rect, z.CellsW, z.CellsH, (Rgb8[])z.Cells.Clone(), z.IsEventDriven, z.Zone.Params[ParamId.EffectDecay], z.Zone.ZIndex);
+            result[i] = new ZoneSnapshot(z.Zone.Id, z.Zone.Name, z.Zone.Rect, z.CellsW, z.CellsH, (Rgb8[])z.Cells.Clone(), z.IsEventDriven, z.Zone.Params[ParamId.EffectDecay], z.Zone.ZIndex, z.Zone.Rotation);
         }
         return result;
     }

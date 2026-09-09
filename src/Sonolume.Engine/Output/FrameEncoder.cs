@@ -6,19 +6,20 @@ namespace Sonolume.Engine.Output;
 
 /// <summary>
 /// Wire format for the SignalRGB effect. Version-prefixed, compact text:
-///   L1|instance|projectName|zoneIndex:id:name:x:y:w:h:cw:ch;...
-///   S1|instance|seq|zoneIndex:WWHHrrggbb...;zoneIndex:...
-///   C1|instance
+///   L2|instance|projectName|zoneIndex:id:name:x:y:w:h:cw:ch:rot;...
+///   S2|instance|seq|zoneIndex:WWHHrrggbb...;zoneIndex:...
+///   C2|instance
 /// Pure functions so the protocol is covered by golden tests without a socket.
 /// </summary>
 public static class FrameEncoder
 {
-    public const int ProtocolVersion = 1;
+    public const int ProtocolVersion = 2;
 
     /// <summary>
-    /// L1|instance|projectName|index:id:name:x:y:w:h:cw:ch;...
+    /// L2|instance|projectName|index:id:name:x:y:w:h:cw:ch:rot;...
     /// Delimited rather than JSON: SignalRGB rewrites braces and quotes on the way into the effect.
-    /// Names have the delimiter characters replaced; they are display-only.
+    /// Names have the delimiter characters replaced; they are display-only. <c>rot</c> is the zone's clockwise
+    /// rotation in degrees, applied to the whole rect (not the cell colors) by the renderer.
     /// </summary>
     public static string EncodeLayout(Layout layout)
     {
@@ -30,7 +31,7 @@ public static class FrameEncoder
             if (i > 0) sb.Append(';');
             sb.Append(z.Index).Append(':').Append(Safe(z.Id)).Append(':').Append(Safe(z.Name)).Append(':');
             sb.Append(Num(z.Rect.X)).Append(':').Append(Num(z.Rect.Y)).Append(':').Append(Num(z.Rect.W)).Append(':').Append(Num(z.Rect.H)).Append(':');
-            sb.Append(z.CellsW).Append(':').Append(z.CellsH);
+            sb.Append(z.CellsW).Append(':').Append(z.CellsH).Append(':').Append(Num(z.Rotation));
         }
         return sb.ToString();
     }

@@ -1,15 +1,15 @@
 /*
  * Sonolume region renderer. Shared by the SignalRGB effect (Sonolume.html) and, later, the plugin's web UI.
- * Protocol v1 (see docs/protocol.md):
- *   L1|inst|projectName|zoneIndex:id:name:x:y:w:h:cw:ch;...   (no JSON: SignalRGB mangles braces/quotes)
- *   S1|inst|seq|zoneIndex:WWHHrrggbb...;zoneIndex:...
- *   C1|inst
+ * Protocol v2 (see docs/protocol.md):
+ *   L2|inst|projectName|zoneIndex:id:name:x:y:w:h:cw:ch:rot;...   (no JSON: SignalRGB mangles braces/quotes)
+ *   S2|inst|seq|zoneIndex:WWHHrrggbb...;zoneIndex:...
+ *   C2|inst
  * The renderer holds no effect logic: it paints what the engine sends and optionally interpolates between frames.
  */
 (function (global) {
   'use strict';
 
-  var PROTOCOL_VERSION = 1;
+  var PROTOCOL_VERSION = 2;
 
   function createRenderer() {
     var state = {
@@ -41,12 +41,12 @@
       var n = cw * ch * 3;
       return {
         index: z.i | 0, id: String(z.id), name: String(z.name || z.id),
-        x: +z.x, y: +z.y, w: +z.w, h: +z.h, cw: cw, ch: ch,
+        x: +z.x, y: +z.y, w: +z.w, h: +z.h, cw: cw, ch: ch, rot: +z.rot || 0,
         cells: new Uint8Array(n), prev: new Uint8Array(n), stampedAt: 0
       };
     }
 
-    // L payload after the header: inst|name|index:id:name:x:y:w:h:cw:ch;...
+    // L payload after the header: inst|name|index:id:name:x:y:w:h:cw:ch:rot;...
     function applyLayout(rest) {
       var p1 = rest.indexOf('|');
       var p2 = rest.indexOf('|', p1 + 1);
@@ -56,9 +56,10 @@
       for (var k = 0; k < items.length; k++) {
         if (!items[k]) continue;
         var f = items[k].split(':');
-        if (f.length < 9) throw new Error('layout zone fields');
+        if (f.length < 10) throw new Error('layout zone fields');
         obj.zones.push({ i: parseInt(f[0], 10), id: f[1], name: f[2], x: parseFloat(f[3]), y: parseFloat(f[4]),
-                         w: parseFloat(f[5]), h: parseFloat(f[6]), cw: parseInt(f[7], 10), ch: parseInt(f[8], 10) });
+                         w: parseFloat(f[5]), h: parseFloat(f[6]), cw: parseInt(f[7], 10), ch: parseInt(f[8], 10),
+                         rot: parseFloat(f[9]) });
       }
       var previous = {};
       for (var i = 0; i < state.zones.length; i++) if (state.zones[i]) previous[state.zones[i].id] = state.zones[i];
@@ -215,6 +216,15 @@
         if (opts.interpolate && z.stampedAt > 0) {
           k = Math.min(1, (t - z.stampedAt) / lerpMs);
         }
+
+        var rotated = z.rot % 360 !== 0;
+        if (rotated) {
+          ctx.save();
+          ctx.translate(zx + zw / 2, zy + zh / 2);
+          ctx.rotate(z.rot * Math.PI / 180);
+          ctx.translate(-(zx + zw / 2), -(zy + zh / 2));
+        }
+
         for (var cy = 0; cy < z.ch; cy++) {
           for (var cx = 0; cx < z.cw; cx++) {
             var o = (cy * z.cw + cx) * 3;
@@ -236,6 +246,7 @@
           ctx.lineWidth = 1;
           ctx.strokeRect(zx + 0.5, zy + 0.5, zw - 1, zh - 1);
         }
+        if (rotated) ctx.restore();
       }
       return lit;
     }

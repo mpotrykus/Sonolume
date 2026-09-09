@@ -269,6 +269,7 @@
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
 
                                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Position" Style="{StaticResource FieldLabelTextStyle}" />
@@ -279,19 +280,23 @@
                                         <TextBox x:Name="ZoneYBox" Grid.Row="0" Grid.Column="6" ToolTip="Y" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
                                         <TextBlock Grid.Row="0" Grid.Column="7" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,0,0,0" />
 
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Size" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
-                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="w" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
-                                        <TextBox x:Name="ZoneWBox" Grid.Row="1" Grid.Column="2" ToolTip="W" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                        <TextBlock Grid.Row="1" Grid.Column="3" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
-                                        <TextBlock Grid.Row="1" Grid.Column="5" Text="h" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
-                                        <TextBox x:Name="ZoneHBox" Grid.Row="1" Grid.Column="6" ToolTip="H" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                        <TextBlock Grid.Row="1" Grid.Column="7" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Rotation" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
+                                        <TextBox x:Name="ZoneRotationBox" Grid.Row="1" Grid.Column="2" ToolTip="Clockwise rotation, in degrees" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                        <TextBlock Grid.Row="1" Grid.Column="3" Text="°" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
 
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Grid" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
-                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="x" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
-                                        <TextBox x:Name="ZoneCellsWBox" Grid.Row="2" Grid.Column="2" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
-                                        <TextBlock Grid.Row="2" Grid.Column="5" Text="y" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
-                                        <TextBox x:Name="ZoneCellsHBox" Grid.Row="2" Grid.Column="6" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="Size" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="w" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                        <TextBox x:Name="ZoneWBox" Grid.Row="2" Grid.Column="2" ToolTip="W" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                        <TextBlock Grid.Row="2" Grid.Column="3" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
+                                        <TextBlock Grid.Row="2" Grid.Column="5" Text="h" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                        <TextBox x:Name="ZoneHBox" Grid.Row="2" Grid.Column="6" ToolTip="H" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                        <TextBlock Grid.Row="2" Grid.Column="7" Text="%" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="4,8,0,0" />
+
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="Grid" Style="{StaticResource FieldLabelTextStyle}" Margin="0,8,0,0" />
+                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="x" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                        <TextBox x:Name="ZoneCellsWBox" Grid.Row="3" Grid.Column="2" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
+                                        <TextBlock Grid.Row="3" Grid.Column="5" Text="y" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,8,4,0" />
+                                        <TextBox x:Name="ZoneCellsHBox" Grid.Row="3" Grid.Column="6" Margin="0,8,0,0" LostFocus="ZoneField_Commit" KeyDown="ZoneField_KeyDown" />
                                     </Grid>
                                 </StackPanel>
                             </StackPanel>

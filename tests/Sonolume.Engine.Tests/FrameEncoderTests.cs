@@ -12,12 +12,12 @@ public class FrameEncoderTests
     {
         var layout = new Layout("abc12345", "Default Kit", new[]
         {
-            new LayoutZone(0, "kick", "Kick", new RectF(0.04f, 0.56f, 0.28f, 0.38f), 1, 1),
-            new LayoutZone(1, "pad", "Pad A:B|C", new RectF(0f, 0f, 1f, 0.5f), 8, 2),
+            new LayoutZone(0, "kick", "Kick", new RectF(0.04f, 0.56f, 0.28f, 0.38f), 1, 1, 0f),
+            new LayoutZone(1, "pad", "Pad A:B|C", new RectF(0f, 0f, 1f, 0.5f), 8, 2, 30f),
         });
 
         Assert.Equal(
-            "L1|abc12345|Default Kit|0:kick:Kick:0.04:0.56:0.28:0.38:1:1;1:pad:Pad A_B_C:0:0:1:0.5:8:2",
+            "L2|abc12345|Default Kit|0:kick:Kick:0.04:0.56:0.28:0.38:1:1:0;1:pad:Pad A_B_C:0:0:1:0.5:8:2:30",
             FrameEncoder.EncodeLayout(layout));
     }
 
@@ -30,13 +30,13 @@ public class FrameEncoderTests
             new Region(2, "hihat", new RectF(0, 0, 1, 1), 2, 1, new[] { new Rgb8(0, 16, 255), new Rgb8(1, 2, 3) }),
         }, false);
 
-        Assert.Equal("S1|abc12345|42|0:0101FF0000;2:02010010FF010203", FrameEncoder.EncodeFrame(frame, "abc12345"));
+        Assert.Equal("S2|abc12345|42|0:0101FF0000;2:02010010FF010203", FrameEncoder.EncodeFrame(frame, "abc12345"));
     }
 
     [Fact]
     public void Clear_Golden()
     {
-        Assert.Equal("C1|abc12345", FrameEncoder.EncodeClear("abc12345"));
+        Assert.Equal("C2|abc12345", FrameEncoder.EncodeClear("abc12345"));
     }
 
     [Fact]

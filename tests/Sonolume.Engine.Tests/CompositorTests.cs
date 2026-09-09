@@ -226,6 +226,7 @@ public class CompositorTests
         Assert.Equal(normal.Reverse(), inverted);
     }
 
+
     [Fact]
     public void AdditiveBlend_UnaffectedByNonOverlappingZoneBelow()
     {
