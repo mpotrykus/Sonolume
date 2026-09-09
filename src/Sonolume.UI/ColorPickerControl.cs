@@ -43,7 +43,7 @@ public sealed class ColorPickerControl : FrameworkElement
     {
         double w = double.IsInfinity(availableSize.Width) ? MaxSquareSize + Gap + HueBarWidth : availableSize.Width;
         double squareSize = Math.Clamp(w - Gap - HueBarWidth, 20, MaxSquareSize);
-        return new Size(w, squareSize);
+        return new Size(squareSize + Gap + HueBarWidth, squareSize);
     }
 
     protected override void OnRender(DrawingContext dc)

@@ -155,6 +155,19 @@
         <Setter Property="CornerRadius" Value="8" />
     </Style>
 
+    <!-- Clickable header row of a GroupBorderStyle disclosure section; bleeds slightly into the group's own
+         padding so the hover highlight reads as a real button instead of floating inside a flat card. -->
+    <Style x:Key="CollapsibleHeaderBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="Padding" Value="8,6" />
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{StaticResource InputBackgroundHoverBrush}" />
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
     <!-- TextBox -->
     <Style TargetType="TextBox">
         <Setter Property="Background" Value="{StaticResource InputBackgroundBrush}" />

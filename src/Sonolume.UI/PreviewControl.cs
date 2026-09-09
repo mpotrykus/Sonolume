@@ -263,8 +263,13 @@ public sealed class PreviewControl : FrameworkElement
         {
             float width = edgeRight - edgeLeft, height = edgeBottom - edgeTop;
             edgeLeft = SnapMoveAxis(edgeLeft, edgeRight, xCandidates, tolX);
-            edgeRight = edgeLeft + width;
             edgeTop = SnapMoveAxis(edgeTop, edgeBottom, yCandidates, tolY);
+
+            // Clamp position against the (unchanged) size so a move drag can't push either edge
+            // past the canvas bounds - clamping X/Y alone would let the far edge escape instead.
+            edgeLeft = Math.Clamp(edgeLeft, 0f, 1f - width);
+            edgeTop = Math.Clamp(edgeTop, 0f, 1f - height);
+            edgeRight = edgeLeft + width;
             edgeBottom = edgeTop + height;
         }
         else
@@ -273,10 +278,15 @@ public sealed class PreviewControl : FrameworkElement
             if (right) edgeRight = Snap(edgeRight, xCandidates, tolX);
             if (top) edgeTop = Snap(edgeTop, yCandidates, tolY);
             if (bottom) edgeBottom = Snap(edgeBottom, yCandidates, tolY);
+
+            edgeLeft = Math.Clamp(edgeLeft, 0f, 1f);
+            edgeRight = Math.Clamp(edgeRight, 0f, 1f);
+            edgeTop = Math.Clamp(edgeTop, 0f, 1f);
+            edgeBottom = Math.Clamp(edgeBottom, 0f, 1f);
         }
 
         float x = edgeLeft, y = edgeTop, rw = edgeRight - edgeLeft, rh = edgeBottom - edgeTop;
-        liveDragRect = new RectF(Math.Clamp(x, 0f, 1f), Math.Clamp(y, 0f, 1f), Math.Clamp(rw, MinZoneSize, 1f), Math.Clamp(rh, MinZoneSize, 1f));
+        liveDragRect = new RectF(x, y, Math.Clamp(rw, MinZoneSize, 1f), Math.Clamp(rh, MinZoneSize, 1f));
         InvalidateVisual();
     }
 

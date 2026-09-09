@@ -146,7 +146,37 @@
             <GridSplitter Grid.Column="1" Style="{StaticResource ColumnSplitterStyle}" />
 
             <Border Grid.Column="2" Style="{StaticResource PanelBorderStyle}" Padding="6">
-                <local:PreviewControl x:Name="Preview" />
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <local:PreviewControl x:Name="Preview" Grid.Row="0" />
+
+                    <StackPanel Grid.Row="1" Margin="0,4,0,0">
+                        <Border x:Name="KeyboardHeader" Style="{StaticResource CollapsibleHeaderBorderStyle}" Margin="-8,0,-8,0"
+                                Cursor="Hand" MouseLeftButtonUp="KeyboardHeader_MouseLeftButtonUp">
+                            <DockPanel>
+                                <TextBlock x:Name="KeyboardChevron" Text="&#xE70D;" FontFamily="{StaticResource IconFontFamily}" FontSize="10"
+                                           VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" Margin="0,0,6,0" />
+                                <TextBlock Text="Keyboard" Style="{StaticResource SectionHeaderTextStyle}" />
+                                <TextBlock x:Name="KeyboardNoteText" VerticalAlignment="Center" Margin="8,0,6,0" TextAlignment="Right" Foreground="{StaticResource KeyLabelBrush}" />
+                            </DockPanel>
+                        </Border>
+                        <local:VirtualKeyboardControl x:Name="VirtualKeyboard" Height="90" Margin="0,8,0,0" Visibility="Collapsed" />
+                        <Grid x:Name="KeyboardOctaveRow" Margin="0,8,0,0" Visibility="Collapsed">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Button x:Name="OctaveDownButton" Grid.Column="0" Content="&#x25C0; Octave" Padding="10,2" Click="OctaveDown_Click" ToolTip="Shift keyboard down an octave" />
+                            <TextBlock x:Name="KeyboardRangeText" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
+                            <Button x:Name="OctaveUpButton" Grid.Column="2" Content="Octave &#x25B6;" Padding="10,2" Click="OctaveUp_Click" ToolTip="Shift keyboard up an octave" />
+                        </Grid>
+                    </StackPanel>
+                </Grid>
             </Border>
 
             <GridSplitter Grid.Column="3" Style="{StaticResource ColumnSplitterStyle}" />
@@ -156,8 +186,7 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
                         <StackPanel x:Name="EmptyFieldsPanel">
-                            <TextBlock Text="Select a zone or group to edit, or add a new one." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
-                            <TextBlock Text="Tip: you can also drag a zone to move it, or drag its handles to resize it, directly on the live preview." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" Margin="0,8,0,0" />
+                            <TextBlock Text="Select or add a zone or group to edit." Style="{StaticResource MutedTextStyle}" TextWrapping="Wrap" />
                         </StackPanel>
 
                         <DockPanel LastChildFill="False" Margin="0,0,0,16">
@@ -207,15 +236,17 @@
                             </DockPanel>
                         </StackPanel>
 
-                        <Border x:Name="ZoneGeometryBorder" Visibility="Collapsed" Style="{StaticResource GroupBorderStyle}" Margin="0,0,0,12" Padding="12">
+                        <Border x:Name="ZoneGeometryBorder" Visibility="Collapsed" Style="{StaticResource GroupBorderStyle}" Margin="0,12,0,12" Padding="12">
                             <StackPanel>
-                                <DockPanel x:Name="ZoneGeometryHeader" Margin="0,0,0,10" Cursor="Hand" Background="Transparent"
-                                           MouseLeftButtonUp="ZoneGeometryHeader_MouseLeftButtonUp">
-                                    <TextBlock x:Name="ZoneGeometryChevron" Text="&#xE70D;" FontFamily="{StaticResource IconFontFamily}" FontSize="10"
-                                               VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" Margin="0,0,6,0" />
-                                    <TextBlock Text="Transform" Style="{StaticResource SectionHeaderTextStyle}" />
-                                </DockPanel>
-                                <StackPanel x:Name="ZoneGeometryContent">
+                                <Border x:Name="ZoneGeometryHeader" Style="{StaticResource CollapsibleHeaderBorderStyle}" Margin="-8,-6,-8,0"
+                                        Cursor="Hand" MouseLeftButtonUp="ZoneGeometryHeader_MouseLeftButtonUp">
+                                    <DockPanel>
+                                        <TextBlock x:Name="ZoneGeometryChevron" Text="&#xE70D;" FontFamily="{StaticResource IconFontFamily}" FontSize="10"
+                                                   VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" Margin="0,0,6,0" />
+                                        <TextBlock Text="Transform" Style="{StaticResource SectionHeaderTextStyle}" />
+                                    </DockPanel>
+                                </Border>
+                                <StackPanel x:Name="ZoneGeometryContent" Margin="0,8,0,8">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,16">
                                         <ToggleButton x:Name="ZoneInvertXToggle" Content="&#x21C4;" Style="{StaticResource ToggleIconButtonStyle}"
                                                       ToolTip="Invert X Axis" Checked="ZoneInvertToggle_Changed" Unchecked="ZoneInvertToggle_Changed" />

@@ -4,6 +4,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Shapes;
 using System.Windows.Threading;
 using Sonolume.Engine.Core;
 using Sonolume.Engine.Effects;
@@ -17,6 +18,10 @@ namespace Sonolume.UI;
 public partial class SonolumeView : UserControl
 {
     private static readonly Brush MutedBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x9A, 0x9A, 0xA3)));
+    private static readonly Brush ColorPickerBackdropBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x24, 0x24, 0x2B)));
+
+    // Mouse clicks carry no velocity, so the virtual keyboard reports a fixed comfortable strike instead of always-max.
+    private const float VirtualKeyboardVelocity = 0.85f;
 
     private enum SelectionKind { None, Zone, Group }
 
@@ -34,8 +39,9 @@ public partial class SonolumeView : UserControl
     private Action<ParamId, float>? paramsActiveOnChange;
     private Point zoneDragStart;
     private bool zoneDragArmed;
-    private bool effectSectionExpanded = true;
-    private bool zoneGeometryExpanded = true;
+    private bool effectSectionExpanded;
+    private bool zoneGeometryExpanded;
+    private bool keyboardExpanded;
 
     /// <summary>Live-bindable controls in the currently-open params panel, so <see cref="RefreshOpenPanel"/> can
     /// push external changes (a CC/macro moving, another view editing the same zone) into them every tick without
@@ -43,7 +49,6 @@ public partial class SonolumeView : UserControl
     /// runs (selection change); cleared on <see cref="ClearSelection"/>.</summary>
     private readonly Dictionary<ParamId, (Slider Slider, TextBlock ValueText)> paramSliders = new();
     private ColorPickerControl? liveColorPicker;
-    private TextBlock? liveColorHsbText;
 
     /// <summary>Effect chosen in the picker for the current selection before anything is learned; once a
     /// Trigger/Gate mapping exists its own EffectId is shown (and edited) instead. Reset whenever the selected
@@ -92,6 +97,12 @@ public partial class SonolumeView : UserControl
         Preview.Editable = true;
         Preview.ZoneClicked += id => session.SelectedZoneId = id;
         Preview.ZoneRectCommitted += CommitZoneRect;
+
+        VirtualKeyboard.NoteOn += note => session.Enqueue(MidiEvent.NoteOn(0, note, VirtualKeyboardVelocity, Clock.Now()));
+        VirtualKeyboard.NoteOff += note => session.Enqueue(MidiEvent.NoteOff(0, note, 0f, Clock.Now()));
+        VirtualKeyboard.NoteHovered += note => KeyboardNoteText.Text = note is { } n ? FormatNoteName(n) : "";
+        VirtualKeyboard.RangeChanged += RefreshKeyboardRange;
+        RefreshKeyboardRange();
 
         previewTimer = new DispatcherTimer(DispatcherPriority.Render) { Interval = TimeSpan.FromMilliseconds(33) };
         previewTimer.Tick += (_, _) => RefreshPreview();
@@ -303,9 +314,7 @@ public partial class SonolumeView : UserControl
         }
         if (liveColorPicker is { IsMouseCaptured: false } picker)
         {
-            float h = values[ParamId.Hue], s = values[ParamId.Saturation], b = values[ParamId.Brightness];
-            picker.SetColor(h, s, b);
-            liveColorHsbText!.Text = FormatHsb(h, s, b);
+            picker.SetColor(values[ParamId.Hue], values[ParamId.Saturation], values[ParamId.Brightness]);
         }
         suppressParamsRefresh = false;
     }
@@ -365,7 +374,6 @@ public partial class SonolumeView : UserControl
         paramsActiveOnChange = null;
         paramSliders.Clear();
         liveColorPicker = null;
-        liveColorHsbText = null;
         liveEffectCombo = null;
         liveEffectLearnButton = null;
         liveEffectTarget = null;
@@ -496,6 +504,7 @@ public partial class SonolumeView : UserControl
         ZoneIdentityPanel.Visibility = Visibility.Visible;
         GroupIdentityPanel.Visibility = Visibility.Collapsed;
         ZoneGeometryBorder.Visibility = Visibility.Visible;
+        ZoneGeometryHeader.Margin = new Thickness(-8, -6, -8, zoneGeometryExpanded ? 10 : 0);
         ZoneGeometryContent.Visibility = zoneGeometryExpanded ? Visibility.Visible : Visibility.Collapsed;
         ZoneGeometryChevron.Text = zoneGeometryExpanded ? "" : "";
         EmptyFieldsPanel.Visibility = Visibility.Collapsed;
@@ -529,9 +538,32 @@ public partial class SonolumeView : UserControl
     private void ZoneGeometryHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         zoneGeometryExpanded = !zoneGeometryExpanded;
+        ZoneGeometryHeader.Margin = new Thickness(-8, -6, -8, zoneGeometryExpanded ? 10 : 0);
         ZoneGeometryContent.Visibility = zoneGeometryExpanded ? Visibility.Visible : Visibility.Collapsed;
         ZoneGeometryChevron.Text = zoneGeometryExpanded ? "" : "";
     }
+
+    private void KeyboardHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        keyboardExpanded = !keyboardExpanded;
+        var visibility = keyboardExpanded ? Visibility.Visible : Visibility.Collapsed;
+        VirtualKeyboard.Visibility = visibility;
+        KeyboardOctaveRow.Visibility = visibility;
+        KeyboardChevron.Text = keyboardExpanded ? "" : "";
+    }
+
+    private void OctaveDown_Click(object sender, RoutedEventArgs e) => VirtualKeyboard.ShiftOctave(-1);
+
+    private void OctaveUp_Click(object sender, RoutedEventArgs e) => VirtualKeyboard.ShiftOctave(1);
+
+    private void RefreshKeyboardRange()
+    {
+        KeyboardRangeText.Text = $"{FormatNoteName(VirtualKeyboard.LowNote)}–{FormatNoteName(VirtualKeyboard.HighNote)}";
+        OctaveDownButton.IsEnabled = VirtualKeyboard.CanShiftDown;
+        OctaveUpButton.IsEnabled = VirtualKeyboard.CanShiftUp;
+    }
+
+    private static string FormatNoteName(int note) => FormatSource(SourceAddress.Note(note).ToString());
 
     private void CommitZoneUpdate(string zoneId, Action<Zone> apply)
     {
@@ -846,7 +878,6 @@ public partial class SonolumeView : UserControl
         panel.Children.Clear();
         paramSliders.Clear();
         liveColorPicker = null;
-        liveColorHsbText = null;
         liveEffectCombo = null;
         liveEffectLearnButton = null;
         liveEffectOnChanged = null;
@@ -870,17 +901,14 @@ public partial class SonolumeView : UserControl
             posYRow.Visibility = posVisibility;
         });
 
-        var rows = new List<UIElement>
-        {
-            effectRow,
-            colorRow,
-            BuildSliderRow(ParamId.EffectIntensity, values, target, project, onChange),
-            BuildSliderRow(ParamId.EffectSpeed, values, target, project, onChange),
-            posXRow,
-            posYRow,
-            BuildSliderRow(ParamId.EffectDecay, values, target, project, onChange),
-        };
+        var rows = new List<UIElement> { effectRow };
         if (blendRow is not null) rows.Add(blendRow);
+        rows.Add(colorRow);
+        rows.Add(BuildSliderRow(ParamId.EffectIntensity, values, target, project, onChange));
+        rows.Add(BuildSliderRow(ParamId.EffectSpeed, values, target, project, onChange));
+        rows.Add(posXRow);
+        rows.Add(posYRow);
+        rows.Add(BuildSliderRow(ParamId.EffectDecay, values, target, project, onChange));
 
         panel.Children.Add(BuildCollapsibleParamGroup(panel, "Effect", rows.ToArray()));
     }
@@ -902,7 +930,7 @@ public partial class SonolumeView : UserControl
         keyButtons.Children.Add(learnButton);
         keyButtons.Children.Add(clearButton);
 
-        var combo = new ComboBox { DisplayMemberPath = "Display", Margin = new Thickness(8, 0, 0, 0) };
+        var combo = new ComboBox { DisplayMemberPath = "Display" };
         var items = BuildEffectComboItems(target, project);
         combo.ItemsSource = items;
 
@@ -955,7 +983,7 @@ public partial class SonolumeView : UserControl
 
     private Border BuildCollapsibleParamGroup(FrameworkElement owner, string title, params UIElement[] rows)
     {
-        var content = new StackPanel { Visibility = effectSectionExpanded ? Visibility.Visible : Visibility.Collapsed };
+        var content = new StackPanel { Visibility = effectSectionExpanded ? Visibility.Visible : Visibility.Collapsed, Margin = new Thickness(0, 16, 0, 16) };
         foreach (var row in rows) content.Children.Add(row);
 
         var chevron = new TextBlock
@@ -971,13 +999,22 @@ public partial class SonolumeView : UserControl
         var headerText = new TextBlock { Text = title };
         if (owner.TryFindResource("SectionHeaderTextStyle") is Style headerStyle) headerText.Style = headerStyle;
 
-        var header = new DockPanel { Margin = new Thickness(0, 0, 0, 10), Cursor = Cursors.Hand, Background = Brushes.Transparent };
-        header.Children.Add(chevron);
-        header.Children.Add(headerText);
+        var headerRow = new DockPanel();
+        headerRow.Children.Add(chevron);
+        headerRow.Children.Add(headerText);
+
+        var header = new Border
+        {
+            Margin = new Thickness(-8, -6, -8, effectSectionExpanded ? 10 : 0),
+            Cursor = Cursors.Hand,
+            Child = headerRow,
+        };
+        if (owner.TryFindResource("CollapsibleHeaderBorderStyle") is Style headerBorderStyle) header.Style = headerBorderStyle;
         header.MouseLeftButtonUp += (_, _) =>
         {
             effectSectionExpanded = !effectSectionExpanded;
             content.Visibility = effectSectionExpanded ? Visibility.Visible : Visibility.Collapsed;
+            header.Margin = new Thickness(-8, -6, -8, effectSectionExpanded ? 10 : 0);
             chevron.Text = effectSectionExpanded ? "" : "";
         };
 
@@ -985,7 +1022,7 @@ public partial class SonolumeView : UserControl
         stack.Children.Add(header);
         stack.Children.Add(content);
 
-        var border = new Border { Margin = new Thickness(0, 0, 0, 12), Padding = new Thickness(12), Child = stack };
+        var border = new Border { Margin = new Thickness(0, 12, 0, 12), Padding = new Thickness(12), Child = stack };
         if (owner.TryFindResource("GroupBorderStyle") is Style borderStyle) border.Style = borderStyle;
         return border;
     }
@@ -1109,29 +1146,42 @@ public partial class SonolumeView : UserControl
 
     private UIElement BuildColorRow(ParamSet values, TargetRef target, Project project, Action<ParamId, float> onChange)
     {
-        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 16) };
+        var stack = new StackPanel { Margin = new Thickness(0, 0, 0, 28) };
 
-        var picker = new ColorPickerControl();
+        var picker = new ColorPickerControl { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
         picker.SetColor(values[ParamId.Hue], values[ParamId.Saturation], values[ParamId.Brightness]);
-        stack.Children.Add(picker);
 
-        var hsbText = new TextBlock
+        var backdrop = new Ellipse { Fill = ColorPickerBackdropBrush };
+
+        var constraint = new Grid { HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center };
+        constraint.Children.Add(picker);
+
+        var host = new Grid { Margin = new Thickness(0, 20, 0, 20) };
+        host.Children.Add(backdrop);
+        host.Children.Add(constraint);
+
+        // The picker's own max footprint (200 square + hue bar) is nearly as wide as the diameter that "fits
+        // the container" gives us, so without shrinking it the corners would touch the circle edge. Sizing
+        // the constraint box to 70% of the diameter leaves visible padding on all sides.
+        host.SizeChanged += (_, e) =>
         {
-            Margin = new Thickness(0, 8, 0, 0),
-            Foreground = MutedBrush,
-            FontFamily = new FontFamily("Consolas"),
-            Text = FormatHsb(values[ParamId.Hue], values[ParamId.Saturation], values[ParamId.Brightness]),
+            double diameter = e.NewSize.Width;
+            if (diameter <= 0) return;
+            backdrop.Width = diameter;
+            backdrop.Height = diameter;
+            double inner = diameter * 0.7;
+            constraint.Width = inner;
+            constraint.Height = inner;
         };
+        stack.Children.Add(host);
+
         picker.ColorChanged += (h, s, b) =>
         {
-            hsbText.Text = FormatHsb(h, s, b);
             onChange(ParamId.Hue, h);
             onChange(ParamId.Saturation, s);
             onChange(ParamId.Brightness, b);
         };
-        stack.Children.Add(hsbText);
         liveColorPicker = picker;
-        liveColorHsbText = hsbText;
 
         // Sliders (not just the color wheel above) so Hue/Saturation/Brightness are directly draggable and get
         // the same macro picker as every other continuous param, instead of only being reachable through the
@@ -1142,9 +1192,6 @@ public partial class SonolumeView : UserControl
         stack.Children.Add(BuildSliderRow(ParamId.Brightness, values, target, project, onChange));
         return stack;
     }
-
-    private static string FormatHsb(float h, float s, float b) =>
-        string.Create(CultureInfo.InvariantCulture, $"H {h,4:0.00} | S {s,4:0.00} | B {b,4:0.00}");
 
     private static void SetGroupCombo(ComboBox combo, Project project, string? selectedId, string? excludeId)
     {

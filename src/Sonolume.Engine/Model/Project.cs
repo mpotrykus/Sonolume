@@ -148,10 +148,10 @@ public sealed class Project
         project.Zones.Add(MakeZone("snare", "Snare", new RectF(0.36f, 0.56f, 0.28f, 0.38f), hue: 0.62f, groupId: "drums"));
         project.Zones.Add(MakeZone("hihat", "Hi-Hat", new RectF(0.68f, 0.56f, 0.28f, 0.38f), hue: 0.15f, groupId: "drums"));
 
-        project.Mappings.Add(TriggerMapping("map-kick", 36, TargetRef.Zone("kick")));
-        project.Mappings.Add(TriggerMapping("map-snare", 38, TargetRef.Zone("snare")));
-        project.Mappings.Add(TriggerMapping("map-hihat", 42, TargetRef.Zone("hihat")));
-        project.Mappings.Add(TriggerMapping("map-drums", 49, TargetRef.Group("drums")));
+        project.Mappings.Add(GateMapping("map-kick", 36, TargetRef.Zone("kick")));
+        project.Mappings.Add(GateMapping("map-snare", 38, TargetRef.Zone("snare")));
+        project.Mappings.Add(GateMapping("map-hihat", 42, TargetRef.Zone("hihat")));
+        project.Mappings.Add(GateMapping("map-drums", 49, TargetRef.Group("drums")));
 
         // Zones only, not the "drums" group - group params multiply onto their children (see Compositor), so
         // giving both the same macro-per-param convention would double-apply every macro move.
@@ -170,13 +170,15 @@ public sealed class Project
         return zone;
     }
 
-    private static Mapping TriggerMapping(string id, int note, TargetRef target) => new()
+    // Gate, not Trigger: a Trigger-mode mapping never accepts a Release event (see Mapping.AcceptsEventType),
+    // and SolidEffect has no auto-decay of its own - paired with Trigger it would light up and never turn off.
+    private static Mapping GateMapping(string id, int note, TargetRef target) => new()
     {
         Id = id,
         Source = SourceAddress.Note(note),
         Target = target,
         Param = ParamId.EffectIntensity,
-        Mode = MappingMode.Trigger,
+        Mode = MappingMode.Gate,
         EffectId = SolidEffect.TypeName,
         Transform = Transform.Identity,
     };
