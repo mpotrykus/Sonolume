@@ -37,7 +37,7 @@
     <DropShadowEffect x:Key="AccentGlowEffect" Color="{StaticResource AccentColor}" Opacity="0.45" BlurRadius="16" ShadowDepth="0" />
 
     <FontFamily x:Key="AppFontFamily">Segoe UI Variable Text, Segoe UI</FontFamily>
-    <FontFamily x:Key="IconFontFamily">Segoe MDL2 Assets</FontFamily>
+    <FontFamily x:Key="IconFontFamily">Segoe Fluent Icons, Segoe MDL2 Assets</FontFamily>
 
     <!-- Typography -->
     <Style x:Key="TitleTextStyle" TargetType="TextBlock">

@@ -114,6 +114,19 @@ public partial class SonolumeView : UserControl
         Unloaded += (_, _) => { previewTimer.Stop(); editorTimer.Stop(); };
     }
 
+    // Opt-in for hosts with a translucent backdrop of their own (e.g. a Mica window):
+    // the DAW plugin editor keeps the fully opaque default since it has no such backdrop.
+    public void UseTranslucentPanels(byte alpha)
+    {
+        var top = WithAlpha((Color)FindResource("PanelBackgroundTopColor"), alpha);
+        var bottom = WithAlpha((Color)FindResource("PanelBackgroundColor"), alpha);
+        var brush = Freeze(new LinearGradientBrush(top, bottom, new Point(0, 0), new Point(0, 1)));
+        foreach (var border in new[] { LeftPanelBorder, CenterPanelBorder, RightPanelBorder })
+            border.Background = brush;
+    }
+
+    private static Color WithAlpha(Color color, byte alpha) => Color.FromArgb(alpha, color.R, color.G, color.B);
+
     private void CommitZoneRect(string id, RectF rect)
     {
         try
