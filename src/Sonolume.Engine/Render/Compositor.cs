@@ -213,6 +213,8 @@ public sealed class Compositor
                         cells[c] = Rgb8.Blend(BlendMode.Additive, scratch[c], cells[c]);
                 }
             }
+
+            ApplyInvert(z);
         }
 
         ApplyBlending();
@@ -228,6 +230,30 @@ public sealed class Compositor
 
     private static void RenderIdle(ZoneRuntime z, Span<Rgb8> cells, in ResolvedParams p) =>
         cells.Fill(z.IsEventDriven ? Rgb8.Black : p.ZoneColor);
+
+    /// <summary>Mirrors the zone's just-rendered cells per <see cref="Zone.InvertX"/>/<see cref="Zone.InvertY"/>, so
+    /// an effect drawn left-to-right or top-to-bottom runs the other way without every effect needing to know about
+    /// zone orientation.</summary>
+    private static void ApplyInvert(ZoneRuntime z)
+    {
+        var zone = z.Zone;
+        if (!zone.InvertX && !zone.InvertY) return;
+
+        int w = z.CellsW, h = z.CellsH;
+        Span<Rgb8> cells = z.Cells;
+        Span<Rgb8> scratch = z.Scratch;
+        cells.CopyTo(scratch);
+
+        for (int y = 0; y < h; y++)
+        {
+            int sy = zone.InvertY ? h - 1 - y : y;
+            for (int x = 0; x < w; x++)
+            {
+                int sx = zone.InvertX ? w - 1 - x : x;
+                cells[y * w + x] = scratch[sy * w + sx];
+            }
+        }
+    }
 
     /// <summary>Blends each zone's own cells over any lower-ZIndex zones whose rect overlaps it, using its own
     /// <see cref="BlendMode"/>. Weighted by actual geometric overlap per cell, so a zone that only partly overlaps

@@ -192,6 +192,41 @@ public class CompositorTests
     }
 
     [Fact]
+    public void InvertX_MirrorsEffectOutputAcrossTheZone()
+    {
+        Rgb8[] RenderStrip(bool invertX)
+        {
+            var project = Project.CreateEmpty();
+            var zone = new Zone { Id = "strip", Name = "strip", CellsW = 4, CellsH = 1, InvertX = invertX };
+            zone.Params[ParamId.Hue] = 0f;
+            zone.Params[ParamId.Saturation] = 1f;
+            zone.Params[ParamId.Brightness] = 1f;
+            zone.Params[ParamId.EffectDecay] = 5f;
+            project.Zones.Add(zone);
+            project.Mappings.Add(new Mapping
+            {
+                Id = "m1",
+                Source = SourceAddress.Note(40),
+                Target = TargetRef.Zone("strip"),
+                Param = ParamId.EffectIntensity,
+                Mode = MappingMode.Trigger,
+                EffectId = WaveEffect.TypeName,
+            });
+
+            var engine = new Engine(project, instanceId: invertX ? "invert0001" : "invert0002");
+            engine.Push(MidiEvent.NoteOn(0, 40, 1f, 0));
+            engine.Tick(0.1f);
+            return engine.TakeFrame(full: true)!.Regions.Single(r => r.ZoneId == "strip").Cells;
+        }
+
+        var normal = RenderStrip(invertX: false);
+        var inverted = RenderStrip(invertX: true);
+
+        Assert.True(normal.Select(c => c.R).Any(r => r > 0), "expected the wave to light up some cells to make this test meaningful");
+        Assert.Equal(normal.Reverse(), inverted);
+    }
+
+    [Fact]
     public void AdditiveBlend_UnaffectedByNonOverlappingZoneBelow()
     {
         var project = Project.CreateEmpty();
