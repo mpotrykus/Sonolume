@@ -45,12 +45,15 @@ public sealed class Mapping
     public string? EffectId { get; set; }
     public Transform Transform { get; set; } = Transform.Identity;
 
+    // Set/Select also accept Trigger: a MIDI note (see DefaultMacros) has no Set-typed event of its own - pressing
+    // it IS the "key = parameter, velocity = value" gesture, carried as a Trigger with Value01 = velocity. CC,
+    // pitch bend, and aftertouch keep producing native Set events, so this doesn't change how they're handled.
     public bool AcceptsEventType(ControlEventType type) => Mode switch
     {
-        MappingMode.Set => type == ControlEventType.Set,
+        MappingMode.Set => type is ControlEventType.Set or ControlEventType.Trigger,
         MappingMode.Trigger => type == ControlEventType.Trigger,
         MappingMode.Gate => type is ControlEventType.Trigger or ControlEventType.Release,
-        MappingMode.Select => type == ControlEventType.Set,
+        MappingMode.Select => type is ControlEventType.Set or ControlEventType.Trigger,
         _ => false,
     };
 }

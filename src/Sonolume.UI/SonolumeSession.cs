@@ -1,6 +1,4 @@
-using System.Threading;
 using Sonolume.Engine;
-using Sonolume.Engine.Core;
 using Sonolume.Engine.Effects;
 using Sonolume.Engine.Input;
 using Sonolume.Engine.Mappings;
@@ -120,36 +118,27 @@ public sealed class SonolumeSession : IDisposable
         HasUnsavedChanges = true;
     }
 
-    /// <summary>Adds the zone pre-wired with the default macro-per-param convention (see <see cref="DefaultMacros"/>)
-    /// so its continuous params are controllable from the DAW's host parameters immediately, no setup needed, and a
-    /// Gate "Key" mapping on the next MIDI note not already claimed by another mapping, so the zone lights up as
-    /// soon as it's added instead of sitting silent until the user manually learns a key.</summary>
+    /// <summary>Adds the zone pre-wired with the default note-per-param convention (see <see cref="DefaultMacros"/>)
+    /// so its continuous params are controllable from its auto-assigned octave immediately, no setup needed, and a
+    /// Gate "Key" mapping on that same octave's root note ("C", see <see cref="DefaultMacros.KeySourceOf"/>) and
+    /// channel, so the zone lights up as soon as it's added instead of sitting silent until the user manually
+    /// learns a key.</summary>
     public void AddZone(Zone zone) => MutateWithUndo(e =>
     {
         e.AddZone(zone);
-        foreach (var m in DefaultMacros.For(TargetRef.Zone(zone.Id))) e.AddMapping(m);
+        var target = TargetRef.Zone(zone.Id);
+        foreach (var m in DefaultMacros.For(e.Project, target)) e.AddMapping(m);
         e.AddMapping(new Mapping
         {
             Id = $"key-{Guid.NewGuid():N}",
-            Source = SourceAddress.Note(NextAvailableNote(e.Project.Mappings)),
-            Target = TargetRef.Zone(zone.Id),
+            Source = DefaultMacros.KeySourceOf(e.Project, target)!.Value,
+            Target = target,
             Param = ParamId.EffectIntensity,
             Mode = MappingMode.Gate,
             EffectId = SolidEffect.TypeName,
             Transform = Transform.Identity,
         });
     });
-
-    /// <summary>Lowest MIDI note (starting from C1/36, matching the default kit's kick) not already used by any
-    /// existing note mapping, regardless of target or mode - two mappings sharing a note would both fire together
-    /// whenever it plays.</summary>
-    private static int NextAvailableNote(IEnumerable<Mapping> mappings)
-    {
-        var used = new HashSet<int>(mappings.Where(m => m.Source.Kind == SourceKind.MidiNote).Select(m => m.Source.Number));
-        int note = 36;
-        while (used.Contains(note)) note++;
-        return note;
-    }
 
     public void RemoveZone(string id) => MutateWithUndo(e => e.RemoveZone(id));
 
@@ -166,19 +155,19 @@ public sealed class SonolumeSession : IDisposable
         }
     });
 
-    /// <summary>Adds the group pre-wired with the default macro-per-param convention (see <see cref="DefaultMacros"/>),
-    /// same as <see cref="AddZone"/>, plus a Gate "Key" mapping on the next MIDI note not already claimed by another
-    /// mapping, so it lights up as soon as it's added instead of sitting silent until the user manually learns a
-    /// key.</summary>
+    /// <summary>Adds the group pre-wired with the default note-per-param convention (see <see cref="DefaultMacros"/>),
+    /// same as <see cref="AddZone"/>, plus a Gate "Key" mapping on that same octave's root note ("C") and channel,
+    /// so it lights up as soon as it's added instead of sitting silent until the user manually learns a key.</summary>
     public void AddGroup(Group group) => MutateWithUndo(e =>
     {
         e.AddGroup(group);
-        foreach (var m in DefaultMacros.For(TargetRef.Group(group.Id))) e.AddMapping(m);
+        var target = TargetRef.Group(group.Id);
+        foreach (var m in DefaultMacros.For(e.Project, target)) e.AddMapping(m);
         e.AddMapping(new Mapping
         {
             Id = $"key-{Guid.NewGuid():N}",
-            Source = SourceAddress.Note(NextAvailableNote(e.Project.Mappings)),
-            Target = TargetRef.Group(group.Id),
+            Source = DefaultMacros.KeySourceOf(e.Project, target)!.Value,
+            Target = target,
             Param = ParamId.EffectIntensity,
             Mode = MappingMode.Gate,
             EffectId = SolidEffect.TypeName,
@@ -259,21 +248,6 @@ public sealed class SonolumeSession : IDisposable
         Runner.Post(e => e.CancelLearn());
         PendingLearn = null;
         learnBeforeSnapshot = null;
-    }
-
-    private long macroEventsReceived;
-
-    /// <summary>How many host macro parameter changes have reached <see cref="SetMacroValue"/>, for the "CC: N"
-    /// status readout - if that number never moves while you're automating a CC in the DAW, the host isn't
-    /// delivering the parameter change to the plugin at all (nothing downstream of it is the problem).</summary>
-    public long MacroEventsReceived => Interlocked.Read(ref macroEventsReceived);
-
-    /// <summary>Feeds a host macro parameter's new value into the engine as a control event, exactly like an
-    /// incoming MIDI CC would be - the plugin calls this from its parameter-change callback.</summary>
-    public void SetMacroValue(int macroIndex, float value01)
-    {
-        Interlocked.Increment(ref macroEventsReceived);
-        Runner.Post(e => e.PushControl(new ControlEvent(SourceAddress.HostMacro(macroIndex), ControlEventType.Set, value01, Clock.Now())));
     }
 
     /// <summary>Call periodically (the editor already polls at a fixed interval). Once a pending learn resolves -

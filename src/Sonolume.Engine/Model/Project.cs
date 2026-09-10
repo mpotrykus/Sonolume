@@ -1,6 +1,5 @@
 using Sonolume.Engine.Core;
 using Sonolume.Engine.Effects;
-using Sonolume.Engine.Input;
 using Sonolume.Engine.Mappings;
 
 namespace Sonolume.Engine.Model;
@@ -136,8 +135,11 @@ public sealed class Project
 
     public static Project CreateEmpty(string name = "Untitled") => new() { Name = name };
 
-    /// <summary>The vertical-slice default: a drum kit of solid-lit zones. C1 (note 36) is the kick;
-    /// note 49 (crash) triggers the whole Drums group.</summary>
+    /// <summary>The vertical-slice default: a drum kit of solid-lit zones. Each zone/group's Key mapping sits on
+    /// its own auto-assigned octave's root note (see <see cref="DefaultMacros.KeySourceOf"/>), the same convention
+    /// a zone/group added through the UI gets - nothing about this kit is hand-picked beyond the zone rects,
+    /// colors, and target order (kick, snare, hihat, then the Drums group), which is what actually decides which
+    /// octave each one lands on.</summary>
     public static Project CreateDefault()
     {
         var project = new Project { Name = "Default Kit" };
@@ -148,12 +150,12 @@ public sealed class Project
         project.Zones.Add(MakeZone("snare", "Snare", new RectF(0.36f, 0.56f, 0.28f, 0.38f), hue: 0.62f, groupId: "drums"));
         project.Zones.Add(MakeZone("hihat", "Hi-Hat", new RectF(0.68f, 0.56f, 0.28f, 0.38f), hue: 0.15f, groupId: "drums"));
 
-        project.Mappings.Add(GateMapping("map-kick", 36, TargetRef.Zone("kick")));
-        project.Mappings.Add(GateMapping("map-snare", 38, TargetRef.Zone("snare")));
-        project.Mappings.Add(GateMapping("map-hihat", 42, TargetRef.Zone("hihat")));
-        project.Mappings.Add(GateMapping("map-drums", 49, TargetRef.Group("drums")));
-
         DefaultMacros.Sync(project);
+
+        project.Mappings.Add(KeyMapping(project, TargetRef.Zone("kick")));
+        project.Mappings.Add(KeyMapping(project, TargetRef.Zone("snare")));
+        project.Mappings.Add(KeyMapping(project, TargetRef.Zone("hihat")));
+        project.Mappings.Add(KeyMapping(project, TargetRef.Group("drums")));
 
         return project;
     }
@@ -170,10 +172,12 @@ public sealed class Project
 
     // Gate, not Trigger: a Trigger-mode mapping never accepts a Release event (see Mapping.AcceptsEventType),
     // and SolidEffect has no auto-decay of its own - paired with Trigger it would light up and never turn off.
-    private static Mapping GateMapping(string id, int note, TargetRef target) => new()
+    // Source must be read back from DefaultMacros.KeySourceOf after DefaultMacros.Sync has run (see CreateDefault)
+    // so target's octave already exists to derive a root note from - same ordering SonolumeSession.AddZone/AddGroup use.
+    private static Mapping KeyMapping(Project project, TargetRef target) => new()
     {
-        Id = id,
-        Source = SourceAddress.Note(note),
+        Id = $"map-{target.Id}",
+        Source = DefaultMacros.KeySourceOf(project, target)!.Value,
         Target = target,
         Param = ParamId.EffectIntensity,
         Mode = MappingMode.Gate,

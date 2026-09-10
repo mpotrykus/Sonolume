@@ -1,3 +1,4 @@
+using System.Linq;
 using Sonolume.Engine.Input;
 using Sonolume.Engine.Mappings;
 using Sonolume.Engine.Model;
@@ -137,5 +138,34 @@ public class ProjectTests
         var drums = project.FindGroup("drums")!;
         Assert.Equal("Renamed", drums.Name);
         Assert.Equal(0.5f, drums.Params[ParamId.Brightness]);
+    }
+
+    [Theory]
+    [InlineData("kick")]
+    [InlineData("snare")]
+    [InlineData("hihat")]
+    public void CreateDefault_ZoneKeyChannel_MatchesItsOctave(string zoneId)
+    {
+        var project = Project.CreateDefault();
+        var target = TargetRef.Zone(zoneId);
+
+        var key = project.Mappings.Single(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate);
+        var octaveChannel = DefaultMacros.EffectTypeSourceOf(project, target)!.Value.Channel;
+
+        Assert.NotEqual(SourceAddress.Any, key.Source.Channel);
+        Assert.Equal(octaveChannel, key.Source.Channel);
+    }
+
+    [Fact]
+    public void CreateDefault_DrumsGroupKeyChannel_MatchesItsOctave()
+    {
+        var project = Project.CreateDefault();
+        var target = TargetRef.Group("drums");
+
+        var key = project.Mappings.Single(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate);
+        var octaveChannel = DefaultMacros.EffectTypeSourceOf(project, target)!.Value.Channel;
+
+        Assert.NotEqual(SourceAddress.Any, key.Source.Channel);
+        Assert.Equal(octaveChannel, key.Source.Channel);
     }
 }

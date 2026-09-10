@@ -9,11 +9,12 @@ namespace Sonolume.Engine.Tests;
 public class MappingTests
 {
     [Fact]
-    public void DefaultProject_Note36_ResolvesToKickSolid()
+    public void DefaultProject_KickKey_ResolvesToKickSolid()
     {
         var project = Project.CreateDefault();
+        var kickKey = DefaultMacros.KeySourceOf(project, TargetRef.Zone("kick"))!.Value;
         var engine = new MappingEngine(project.Mappings);
-        var e = new ControlEvent(new SourceAddress(SourceKind.MidiNote, 0, 36), ControlEventType.Trigger, 0.75f, 0);
+        var e = new ControlEvent(kickKey, ControlEventType.Trigger, 0.75f, 0);
 
         var actions = new MappingAction[8];
         int n = engine.Resolve(e, actions);
@@ -28,8 +29,9 @@ public class MappingTests
     [Fact]
     public void UnmappedNote_ResolvesToNothing()
     {
+        // Well past every default-kit target's octave (kick/snare/hihat/drums only claim notes 0-47 on channel 0).
         var engine = new MappingEngine(Project.CreateDefault().Mappings);
-        var e = new ControlEvent(new SourceAddress(SourceKind.MidiNote, 0, 37), ControlEventType.Trigger, 1f, 0);
+        var e = new ControlEvent(new SourceAddress(SourceKind.MidiNote, 0, 100), ControlEventType.Trigger, 1f, 0);
         Assert.Equal(0, engine.Resolve(e, new MappingAction[8]));
     }
 
@@ -53,9 +55,12 @@ public class MappingTests
     public void DisabledMapping_IsSkipped()
     {
         var project = Project.CreateDefault();
-        project.Mappings[0].Enabled = false;
+        var target = TargetRef.Zone("kick");
+        var kickKey = DefaultMacros.KeySourceOf(project, target)!.Value;
+        project.Mappings.Single(m => m.Target == target && m.Mode == MappingMode.Gate).Enabled = false;
+
         var engine = new MappingEngine(project.Mappings);
-        var e = new ControlEvent(new SourceAddress(SourceKind.MidiNote, 0, 36), ControlEventType.Trigger, 1f, 0);
+        var e = new ControlEvent(kickKey, ControlEventType.Trigger, 1f, 0);
         Assert.Equal(0, engine.Resolve(e, new MappingAction[8]));
     }
 

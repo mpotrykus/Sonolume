@@ -18,6 +18,15 @@ public class EngineTests
         return frame.Regions.Single(r => r.ZoneId == "kick").Cells[0];
     }
 
+    /// <summary>A NoteOn on the default kit's kick zone - the kick's Key mapping now sits on its own auto-assigned
+    /// octave's root note (see <see cref="DefaultMacros.KeySourceOf"/>), not a fixed note 36, so tests must read it
+    /// back rather than assume it.</summary>
+    private static MidiEvent KickNoteOn(Engine engine, float velocity01)
+    {
+        var source = DefaultMacros.KeySourceOf(engine.Project, TargetRef.Zone("kick"))!.Value;
+        return MidiEvent.NoteOn(source.Channel, source.Number, velocity01, 0);
+    }
+
     [Fact]
     public void FirstFullFrame_IsBlackForEventDrivenZones()
     {
@@ -36,7 +45,7 @@ public class EngineTests
         engine.Tick(0f);
         engine.TakeFrame(full: true);
 
-        engine.Push(MidiEvent.NoteOn(0, 36, 1f, 0));
+        engine.Push(KickNoteOn(engine, 1f));
         engine.Tick(0f);
         var frame = engine.TakeFrame();
 
@@ -50,7 +59,7 @@ public class EngineTests
     public void Velocity_ScalesBrightness()
     {
         var engine = NewEngine();
-        engine.Push(MidiEvent.NoteOn(0, 36, 0.5f, 0));
+        engine.Push(KickNoteOn(engine, 0.5f));
         engine.Tick(0f);
         var c = KickColor(engine);
         Assert.InRange(c.R, 126, 129);
@@ -124,7 +133,7 @@ public class EngineTests
     {
         var engine = NewEngine();
         engine.SetParam(TargetRef.Group("drums"), ParamId.Brightness, 0.5f);
-        engine.Push(MidiEvent.NoteOn(0, 36, 1f, 0));
+        engine.Push(KickNoteOn(engine, 1f));
         engine.Tick(0f);
         var c = KickColor(engine);
         Assert.InRange(c.R, 126, 129);
@@ -144,12 +153,12 @@ public class EngineTests
         });
 
         engine.Push(MidiEvent.ControlChange(0, 7, 0, 0));
-        engine.Push(MidiEvent.NoteOn(0, 36, 1f, 0));
+        engine.Push(KickNoteOn(engine, 1f));
         engine.Tick(0f);
         Assert.Equal(Rgb8.Black, KickColor(engine));
 
         engine.Push(MidiEvent.ControlChange(0, 7, 127, 0));
-        engine.Push(MidiEvent.NoteOn(0, 36, 1f, 0));
+        engine.Push(KickNoteOn(engine, 1f));
         engine.Tick(0f);
         Assert.Equal(new Rgb8(255, 0, 0), KickColor(engine));
     }
@@ -192,7 +201,7 @@ public class EngineTests
         Assert.Contains(engine.Project.Mappings, m => m.Id == learned.Id);
 
         engine.Push(MidiEvent.ControlChange(0, 74, 0, 0));
-        engine.Push(MidiEvent.NoteOn(0, 36, 1f, 0));
+        engine.Push(KickNoteOn(engine, 1f));
         engine.Tick(0f);
         Assert.Equal(Rgb8.Black, KickColor(engine));
     }
@@ -259,7 +268,7 @@ public class EngineTests
         engine.RemoveGroup("drums");
 
         Assert.Null(engine.Project.FindZone("kick")!.GroupId);
-        engine.Push(MidiEvent.NoteOn(0, 36, 1f, 0));
+        engine.Push(KickNoteOn(engine, 1f));
         engine.Tick(0f);
         var c = KickColor(engine);
         Assert.Equal(255, c.R);
@@ -352,8 +361,15 @@ public class EngineTests
     /// default kit's zones. The Brightness mapping itself comes from <see cref="DefaultMacros"/> (via
     /// <see cref="Engine"/>'s constructor syncing every zone/group to the fixed convention), not a hand-built
     /// Mapping, since that convention is what actually decides which slot drives Brightness.</summary>
+    /// <summary>Exercises the exact pipeline a MIDI note drives: a NoteOn on the zone's auto-assigned Brightness
+    /// note, resolved through a Set-mode Mapping, on a zone with no Trigger/Gate mapping (so it isn't event-driven
+    /// and isn't scaled by any effect's captured level) - isolating whether that path works at all, independent of
+    /// the Solid-effect level-compositing that confounds testing on the default kit's zones. The Brightness mapping
+    /// itself comes from <see cref="DefaultMacros"/> (via <see cref="Engine"/>'s constructor syncing every
+    /// zone/group to the fixed convention), not a hand-built Mapping, since that convention is what actually
+    /// decides which note drives Brightness.</summary>
     [Fact]
-    public void HostMacroSet_ControlsBrightness_OnNonEventDrivenZone()
+    public void NoteOn_ControlsBrightness_OnNonEventDrivenZone()
     {
         var project = Project.CreateEmpty();
         var zone = new Zone { Id = "z1", Name = "Z1" };
@@ -365,8 +381,8 @@ public class EngineTests
         engine.Tick(0f);
         engine.TakeFrame(full: true);
 
-        int brightnessSlot = DefaultMacros.SlotFor(ParamId.Brightness);
-        engine.PushControl(new ControlEvent(SourceAddress.HostMacro(brightnessSlot), ControlEventType.Set, 0.3f, 0));
+        var source = DefaultMacros.ParamSourceOf(engine.Project, TargetRef.Zone("z1"), ParamId.Brightness)!.Value;
+        engine.Push(MidiEvent.NoteOn(source.Channel, source.Number, 0.3f, 0));
         engine.Tick(0f);
 
         var c = KickColorOf(engine, "z1");

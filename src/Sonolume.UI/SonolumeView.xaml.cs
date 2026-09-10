@@ -179,8 +179,7 @@ public partial class SonolumeView : UserControl
         }
 
         StatusText.Text = Describe(session.Sink.Status);
-        MidiText.Text = $"MIDI: {session.Runner.ProcessedEvents} events" + (session.Runner.DroppedEvents > 0 ? $", {session.Runner.DroppedEvents} dropped" : "")
-            + $"  |  CC: {session.MacroEventsReceived} events";
+        MidiText.Text = $"MIDI: {session.Runner.ProcessedEvents} events" + (session.Runner.DroppedEvents > 0 ? $", {session.Runner.DroppedEvents} dropped" : "");
     }
 
     private static string Describe(SinkStatus status) => status.State switch
@@ -970,10 +969,10 @@ public partial class SonolumeView : UserControl
             Style = (Style)panel.FindResource("GroupBorderStyle"),
             Padding = new Thickness(12),
             Margin = new Thickness(0, 0, 0, 16),
-            Child = BuildColorSliders(values, onChange),
+            Child = BuildColorSliders(values, target, onChange),
         });
-        var posXRow = BuildSliderRow(ParamId.PosX, values, onChange);
-        var posYRow = BuildSliderRow(ParamId.PosY, values, onChange);
+        var posXRow = BuildSliderRow(ParamId.PosX, values, target, onChange);
+        var posYRow = BuildSliderRow(ParamId.PosY, values, target, onChange);
         var effectRow = BuildEffectRow(target, id =>
         {
             colorGroup.Visibility = id == RainbowEffect.TypeName ? Visibility.Collapsed : Visibility.Visible;
@@ -986,9 +985,9 @@ public partial class SonolumeView : UserControl
         posYRowElement.Margin = new Thickness(posYRowElement.Margin.Left, posYRowElement.Margin.Top, posYRowElement.Margin.Right, 0);
 
         var modulationRows = new StackPanel();
-        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectIntensity, values, onChange));
-        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectSpeed, values, onChange));
-        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectDecay, values, onChange));
+        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectIntensity, values, target, onChange));
+        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectSpeed, values, target, onChange));
+        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectDecay, values, target, onChange));
         modulationRows.Children.Add(posXRow);
         modulationRows.Children.Add(posYRow);
 
@@ -1009,22 +1008,23 @@ public partial class SonolumeView : UserControl
     }
 
     /// <summary>Picks which effect the target's Trigger/Gate mapping uses. Live effect-type switching is a
-    /// Select-mode mapping (see <see cref="MappingMode.Select"/>) fixed to <see cref="DefaultMacros.EffectTypeSlot"/>
-    /// (see <see cref="BuildMacroLabel"/>) the moment a zone/group is created (see
-    /// <see cref="SonolumeSession.AddZone"/>/<see cref="SonolumeSession.AddGroup"/>) so it's already live with no
-    /// setup. Built fresh each time the panel is rebuilt (on selection change), like the color and blend rows, but
-    /// kept live afterward by <see cref="RefreshEffectKeyControls"/> - unlike them, the macro firing changes the
-    /// target's EffectId (and thus what this row should show) out from under it.</summary>
+    /// Select-mode mapping (see <see cref="MappingMode.Select"/>) fixed to a note in the target's octave (see
+    /// <see cref="DefaultMacros.EffectTypeSourceOf"/>, and <see cref="BuildMacroLabel"/>) the moment a zone/group
+    /// is created (see <see cref="SonolumeSession.AddZone"/>/<see cref="SonolumeSession.AddGroup"/>) so it's
+    /// already live with no setup. Built fresh each time the panel is rebuilt (on selection change), like the
+    /// color and blend rows, but kept live afterward by <see cref="RefreshEffectKeyControls"/> - unlike them, the
+    /// macro firing changes the target's EffectId (and thus what this row should show) out from under it.</summary>
     private UIElement BuildEffectRow(TargetRef target, Action<string> onEffectIdChanged)
     {
         var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
         var label = new TextBlock { Text = "Type", Width = 60, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
 
-        var macroLabel = BuildMacroLabel(DefaultMacros.EffectTypeSlot);
+        var proj = projectSnapshot ?? session.GetProjectCopy();
+        var macroLabel = BuildMacroLabel(DefaultMacros.EffectTypeSourceOf(proj, target));
 
         var combo = new ComboBox { DisplayMemberPath = "Label", ItemsSource = EffectOptions };
 
-        string effectId = (projectSnapshot ?? session.GetProjectCopy()).Mappings
+        string effectId = proj.Mappings
             .FirstOrDefault(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate)?.EffectId ?? pendingEffectId;
         combo.SelectedItem = Array.Find(EffectOptions, o => o.Id == effectId) ?? EffectOptions[0];
 
@@ -1137,7 +1137,7 @@ public partial class SonolumeView : UserControl
         _ => null,
     };
 
-    private UIElement BuildSliderRow(ParamId id, ParamSet values, Action<ParamId, float> onChange)
+    private UIElement BuildSliderRow(ParamId id, ParamSet values, TargetRef target, Action<ParamId, float> onChange)
     {
         var info = ParamInfos.Of(id);
         var stack = new StackPanel();
@@ -1163,7 +1163,8 @@ public partial class SonolumeView : UserControl
 
         if (id is not ParamId.PaletteIndex) // no effect reads this yet - not worth mapping either
         {
-            var macroLabel = BuildMacroLabel(DefaultMacros.SlotFor(id));
+            var proj = projectSnapshot ?? session.GetProjectCopy();
+            var macroLabel = BuildMacroLabel(DefaultMacros.ParamSourceOf(proj, target, id));
             DockPanel.SetDock(macroLabel, Dock.Right);
             headerRow.Children.Add(macroLabel);
         }
@@ -1240,14 +1241,17 @@ public partial class SonolumeView : UserControl
 
     private static readonly Brush MacroLabelPillBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x38)));
 
-    /// <summary>Shows which host macro drives a param or select mapping - fixed by <see cref="DefaultMacros"/>,
-    /// never user-editable, so this is a plain pill badge where a picker combo used to sit. Fixed width (rather
-    /// than sized to "CC 00".."CC 09") so every row's pill lines up regardless of slot number.</summary>
-    private static Border BuildMacroLabel(int slot) => new()
+    /// <summary>Shows which note drives a param or select mapping - fixed by <see cref="DefaultMacros"/>, never
+    /// user-editable, so this is a plain pill badge where a picker combo used to sit. Fixed width (rather than
+    /// sized to its content) so every row's pill lines up regardless of note/channel text length. Null only if the
+    /// target hasn't been synced to the convention yet (shouldn't happen once a zone/group has been added).</summary>
+    private static Border BuildMacroLabel(SourceAddress? source) => new()
     {
         Child = new TextBlock
         {
-            Text = $"CC {slot:00}",
+            // "ch1" -> "CH1": only this pill's rendering, not SourceAddress.ToString() itself (the Key label and
+            // everything else that reads a source's name keeps the lowercase form).
+            Text = source?.ToString().Replace(" ch", " CH", StringComparison.Ordinal) ?? "—",
             TextAlignment = TextAlignment.Center,
             Foreground = MutedBrush,
         },
@@ -1255,20 +1259,21 @@ public partial class SonolumeView : UserControl
         CornerRadius = new CornerRadius(10),
         Padding = new Thickness(8, 2, 8, 2),
         Margin = new Thickness(6, 0, 0, 0),
-        Width = 56,
+        Width = 72,
         HorizontalAlignment = HorizontalAlignment.Right,
         VerticalAlignment = VerticalAlignment.Center,
     };
 
-    /// <summary>Picks the zone's blend mode - the CC driving live blend switching is fixed at
-    /// <see cref="DefaultMacros.BlendSlot"/> (see <see cref="BuildMacroLabel"/>), the same pairing as
+    /// <summary>Picks the zone's blend mode - the note driving live blend switching is fixed at
+    /// <see cref="DefaultMacros.BlendSourceOf"/> (see <see cref="BuildMacroLabel"/>), the same pairing as
     /// <see cref="BuildEffectRow"/>'s "Type" row. Built fresh whenever the zone panel is rebuilt (see
     /// <see cref="LoadZonePanel"/>), then kept live by <see cref="RefreshBlendKeyControls"/>.</summary>
     private UIElement BuildBlendRow(Zone zone, TargetRef target, Action<BlendMode> onChange)
     {
         var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
         var label = new TextBlock { Text = "Blend", Width = 60, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
-        var macroLabel = BuildMacroLabel(DefaultMacros.BlendSlot);
+        var proj = projectSnapshot ?? session.GetProjectCopy();
+        var macroLabel = BuildMacroLabel(DefaultMacros.BlendSourceOf(proj, target));
         var combo = new ComboBox { ItemsSource = Enum.GetValues<BlendMode>(), SelectedItem = zone.Blend };
         combo.SelectionChanged += (_, _) =>
         {
@@ -1329,18 +1334,18 @@ public partial class SonolumeView : UserControl
     }
 
     // Sliders (not just the color wheel above) so Hue/Saturation/Brightness are directly draggable and get
-    // the same fixed CC label as every other continuous param, instead of only being reachable through the
+    // the same fixed note label as every other continuous param, instead of only being reachable through the
     // wheel. The two stay in sync: RefreshOpenPanel pushes live values into both every tick (see paramSliders,
-    // liveColorPicker) whenever a CC/macro or another view is what's driving the change.
-    private UIElement BuildColorSliders(ParamSet values, Action<ParamId, float> onChange)
+    // liveColorPicker) whenever a mapped note or another view is what's driving the change.
+    private UIElement BuildColorSliders(ParamSet values, TargetRef target, Action<ParamId, float> onChange)
     {
         var stack = new StackPanel();
 
-        var brightnessRow = (FrameworkElement)BuildSliderRow(ParamId.Brightness, values, onChange);
+        var brightnessRow = (FrameworkElement)BuildSliderRow(ParamId.Brightness, values, target, onChange);
         brightnessRow.Margin = new Thickness(brightnessRow.Margin.Left, brightnessRow.Margin.Top, brightnessRow.Margin.Right, 0);
 
-        stack.Children.Add(BuildSliderRow(ParamId.Hue, values, onChange));
-        stack.Children.Add(BuildSliderRow(ParamId.Saturation, values, onChange));
+        stack.Children.Add(BuildSliderRow(ParamId.Hue, values, target, onChange));
+        stack.Children.Add(BuildSliderRow(ParamId.Saturation, values, target, onChange));
         stack.Children.Add(brightnessRow);
         return stack;
     }

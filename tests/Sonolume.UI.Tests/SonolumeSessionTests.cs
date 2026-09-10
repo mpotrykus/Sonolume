@@ -22,34 +22,33 @@ public class SonolumeSessionTests
     }
 
     [Fact]
-    public void AddZone_AutoAssignsNextAvailableKey()
+    public void AddZone_KeyMapping_IsItsOctavesRootNote()
     {
         using var session = NewSession();
 
         session.AddZone(new Zone { Id = "new1", Name = "New 1" });
         session.AddZone(new Zone { Id = "new2", Name = "New 2" });
 
-        var mappings = session.GetProjectCopy().Mappings;
-        var key1 = mappings.Single(m => m.Target == TargetRef.Zone("new1") && m.Mode == MappingMode.Gate);
-        var key2 = mappings.Single(m => m.Target == TargetRef.Zone("new2") && m.Mode == MappingMode.Gate);
+        var project = session.GetProjectCopy();
+        var key1 = project.Mappings.Single(m => m.Target == TargetRef.Zone("new1") && m.Mode == MappingMode.Gate);
+        var key2 = project.Mappings.Single(m => m.Target == TargetRef.Zone("new2") && m.Mode == MappingMode.Gate);
 
-        // Default kit already claims notes 36 (kick), 38 (snare), 42 (hihat), 49 (drums group).
-        Assert.Equal(37, key1.Source.Number);
-        Assert.Equal(39, key2.Source.Number);
+        Assert.Equal(DefaultMacros.KeySourceOf(project, TargetRef.Zone("new1"))!.Value, key1.Source);
+        Assert.Equal(DefaultMacros.KeySourceOf(project, TargetRef.Zone("new2"))!.Value, key2.Source);
+        Assert.NotEqual(key1.Source, key2.Source);
     }
 
     [Fact]
-    public void AddGroup_AutoAssignsNextAvailableKey()
+    public void AddGroup_KeyMapping_IsItsOctavesRootNote()
     {
         using var session = NewSession();
 
         session.AddGroup(new Group { Id = "newgroup", Name = "New Group" });
 
-        var mappings = session.GetProjectCopy().Mappings;
-        var key = mappings.Single(m => m.Target == TargetRef.Group("newgroup") && m.Mode == MappingMode.Gate);
+        var project = session.GetProjectCopy();
+        var key = project.Mappings.Single(m => m.Target == TargetRef.Group("newgroup") && m.Mode == MappingMode.Gate);
 
-        // Default kit already claims notes 36 (kick), 38 (snare), 42 (hihat), 49 (drums group).
-        Assert.Equal(37, key.Source.Number);
+        Assert.Equal(DefaultMacros.KeySourceOf(project, TargetRef.Group("newgroup"))!.Value, key.Source);
     }
 
     [Fact]
