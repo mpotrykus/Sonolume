@@ -153,7 +153,7 @@ public sealed class Project
         project.Mappings.Add(GateMapping("map-hihat", 42, TargetRef.Zone("hihat")));
         project.Mappings.Add(GateMapping("map-drums", 49, TargetRef.Group("drums")));
 
-        DefaultMacros.BackfillIfMissing(project);
+        DefaultMacros.Sync(project);
 
         return project;
     }

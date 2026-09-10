@@ -1,4 +1,3 @@
-using System.Linq;
 using Sonolume.Engine.Input;
 using Sonolume.Engine.Model;
 
@@ -86,13 +85,18 @@ public static class DefaultMacros
         }
     }
 
-    /// <summary>One-time migration for projects saved before this convention existed (a REAPER session's saved
-    /// plugin state, an older .sonolume file, ...): if the whole project has zero host-macro mappings anywhere,
-    /// seeds every zone and group with the fixed convention. No-op the moment even one HostMacro mapping exists
-    /// anywhere, so this never fights a project that's already been migrated. Called on every project load.</summary>
-    public static void BackfillIfMissing(Project project)
+    /// <summary>Re-derives every HostMacro mapping from the fixed convention, for every zone and group. Since
+    /// the convention is now permanent (nothing in the UI can repoint a param to a different macro), there is no
+    /// such thing as a project that has "already migrated" with a different-but-valid layout - so unlike a true
+    /// one-time backfill, this discards and regenerates the HostMacro mappings every time rather than skipping
+    /// when some already exist. That matters for a project saved under an earlier version of this convention (a
+    /// different slot order, or a project from before Select-mode Effect Type/Blend slots existed): without this,
+    /// its stale HostMacro mappings would silently keep driving the old params forever while the plugin's host
+    /// parameter labels (regenerated fresh from the current convention on every load) claimed otherwise. Called on
+    /// every project load.</summary>
+    public static void Sync(Project project)
     {
-        if (project.Mappings.Any(m => m.Source.Kind == SourceKind.HostMacro)) return;
+        project.Mappings.RemoveAll(m => m.Source.Kind == SourceKind.HostMacro);
         foreach (var zone in project.Zones) project.Mappings.AddRange(For(TargetRef.Zone(zone.Id)));
         foreach (var group in project.Groups) project.Mappings.AddRange(For(TargetRef.Group(group.Id)));
     }

@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -71,6 +72,8 @@ public partial class SonolumeView : UserControl
     private TargetRef? liveBlendTarget;
     private bool suppressBlendCombo;
 
+    private bool suppressChannelCombo;
+
     private sealed record EffectOption(string Id, string Label);
 
     private static readonly EffectOption[] EffectOptions =
@@ -86,12 +89,25 @@ public partial class SonolumeView : UserControl
         new(RainbowEffect.TypeName, "Rainbow"),
     ];
 
+    private sealed record ChannelOption(int Value, string Label);
+
+    private static readonly ChannelOption[] ChannelOptions =
+    [
+        new(SourceAddress.Any, "Any"),
+        .. Enumerable.Range(0, 16).Select(channel => new ChannelOption(channel, $"CH {channel + 1}")),
+    ];
+
     private Window OwnerWindow => Window.GetWindow(this) ?? throw new InvalidOperationException("SonolumeView is not hosted in a Window.");
 
     public SonolumeView(SonolumeSession session)
     {
         this.session = session;
         InitializeComponent();
+
+        ZoneChannelCombo.ItemsSource = ChannelOptions;
+        ZoneChannelCombo.SelectedIndex = 0;
+        GroupChannelCombo.ItemsSource = ChannelOptions;
+        GroupChannelCombo.SelectedIndex = 0;
 
         Preview.Editable = true;
         Preview.ZoneClicked += id => session.SelectedZoneId = id;
@@ -260,7 +276,7 @@ public partial class SonolumeView : UserControl
                 suppressCombo = false;
             }
 
-            RefreshKeyControls(TargetRef.Zone(zone.Id), TargetKind.Zone, project, ZoneKeyText, ZoneLearnKeyButton, ZoneClearKeyButton);
+            RefreshKeyControls(TargetRef.Zone(zone.Id), TargetKind.Zone, project, ZoneKeyText, ZoneLearnKeyButton, ZoneClearKeyButton, ZoneChannelCombo);
             RefreshParamsLive(zone.Params);
             RefreshEffectKeyControls(TargetRef.Zone(zone.Id), project);
             RefreshBlendKeyControls(TargetRef.Zone(zone.Id), zone.Blend);
@@ -279,7 +295,7 @@ public partial class SonolumeView : UserControl
                 suppressCombo = false;
             }
 
-            RefreshKeyControls(TargetRef.Group(group.Id), TargetKind.Group, project, GroupKeyText, GroupLearnKeyButton, GroupClearKeyButton);
+            RefreshKeyControls(TargetRef.Group(group.Id), TargetKind.Group, project, GroupKeyText, GroupLearnKeyButton, GroupClearKeyButton, GroupChannelCombo);
             RefreshParamsLive(group.Params);
             RefreshEffectKeyControls(TargetRef.Group(group.Id), project);
         }
@@ -344,14 +360,30 @@ public partial class SonolumeView : UserControl
     }
 
     /// <summary>Keeps a zone/group's "Key" row in sync with <see cref="SonolumeSession.PendingLearn"/> and
-    /// its current mapping(s), the same way <see cref="RefreshOpenPanel"/> keeps every other field in sync.</summary>
-    private void RefreshKeyControls(TargetRef target, TargetKind kind, Project project, TextBlock keyText, Button learnButton, Button clearButton)
+    /// its current mapping(s), the same way <see cref="RefreshOpenPanel"/> keeps every other field in sync. The
+    /// channel combo mirrors the Key mapping(s)' <see cref="SourceAddress.Channel"/> directly (not through Learn),
+    /// the same live-editing pattern as <see cref="RefreshBlendKeyControls"/> - skipped while its dropdown is open,
+    /// guarded by <see cref="suppressChannelCombo"/> so pushing the value in doesn't loop back through
+    /// <see cref="ChannelCombo_SelectionChanged"/>.</summary>
+    private void RefreshKeyControls(TargetRef target, TargetKind kind, Project project, TextBlock keyText, Button learnButton, Button clearButton, ComboBox channelCombo)
     {
         bool listening = session.IsPendingLearn(target, ParamId.EffectIntensity, MappingMode.Gate);
         string? keyLabel = BuildKeyLabels(project.Mappings, kind).GetValueOrDefault(target.Id);
         keyText.Text = listening ? "Listening..." : keyLabel ?? "(none)";
         learnButton.Content = listening ? "Cancel" : "Learn";
         clearButton.IsEnabled = !listening && keyLabel is not null;
+
+        if (!channelCombo.IsDropDownOpen)
+        {
+            int? channel = project.Mappings
+                .Where(m => m.Enabled && m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate)
+                .Select(m => (int?)m.Source.Channel).FirstOrDefault();
+
+            suppressChannelCombo = true;
+            channelCombo.SelectedItem = ChannelOptions.FirstOrDefault(o => o.Value == (channel ?? SourceAddress.Any)) ?? ChannelOptions[0];
+            suppressChannelCombo = false;
+            channelCombo.IsEnabled = !listening && channel is not null;
+        }
     }
 
     private void LearnKeyButton_Click(object sender, RoutedEventArgs e)
@@ -372,6 +404,13 @@ public partial class SonolumeView : UserControl
 
         session.RemoveMappingsForTarget(target);
         RefreshEditor();
+    }
+
+    private void ChannelCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (suppressChannelCombo) return;
+        if (CurrentTarget() is not { } target) return;
+        if (sender is ComboBox { SelectedItem: ChannelOption option }) session.SetKeyChannel(target, option.Value);
     }
 
     private TargetRef? CurrentTarget() => (currentKind, currentId) switch
@@ -529,7 +568,7 @@ public partial class SonolumeView : UserControl
         ZoneIdentityPanel.Visibility = Visibility.Visible;
         GroupIdentityPanel.Visibility = Visibility.Collapsed;
         ZoneGeometryBorder.Visibility = Visibility.Visible;
-        ZoneGeometryHeader.Margin = new Thickness(-8, -6, -8, zoneGeometryExpanded ? 10 : 0);
+        ZoneGeometryHeader.Margin = new Thickness(-12, -12, -12, zoneGeometryExpanded ? 10 : -12);
         ZoneGeometryContent.Visibility = zoneGeometryExpanded ? Visibility.Visible : Visibility.Collapsed;
         ZoneGeometryChevron.Text = zoneGeometryExpanded ? "" : "";
         EmptyFieldsPanel.Visibility = Visibility.Collapsed;
@@ -559,12 +598,14 @@ public partial class SonolumeView : UserControl
         ParamsTitle.Visibility = Visibility.Visible;
         RebuildParamsPanel(ParamsPanel, zone.Params, TargetRef.Zone(zoneId), (id, raw) => session.SetParam(TargetRef.Zone(zoneId), id, raw),
             BuildBlendRow(zone, TargetRef.Zone(zoneId), mode => CommitZoneUpdate(zoneId, z => z.Blend = mode)));
+
+        RefreshKeyControls(TargetRef.Zone(zoneId), TargetKind.Zone, project, ZoneKeyText, ZoneLearnKeyButton, ZoneClearKeyButton, ZoneChannelCombo);
     }
 
     private void ZoneGeometryHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         zoneGeometryExpanded = !zoneGeometryExpanded;
-        ZoneGeometryHeader.Margin = new Thickness(-8, -6, -8, zoneGeometryExpanded ? 10 : 0);
+        ZoneGeometryHeader.Margin = new Thickness(-12, -12, -12, zoneGeometryExpanded ? 10 : -12);
         ZoneGeometryContent.Visibility = zoneGeometryExpanded ? Visibility.Visible : Visibility.Collapsed;
         ZoneGeometryChevron.Text = zoneGeometryExpanded ? "" : "";
     }
@@ -750,6 +791,8 @@ public partial class SonolumeView : UserControl
         ParamsTitle.Text = group.Name;
         ParamsTitle.Visibility = Visibility.Visible;
         RebuildParamsPanel(ParamsPanel, group.Params, TargetRef.Group(groupId), (id, raw) => session.SetParam(TargetRef.Group(groupId), id, raw));
+
+        RefreshKeyControls(TargetRef.Group(groupId), TargetKind.Group, project, GroupKeyText, GroupLearnKeyButton, GroupClearKeyButton, GroupChannelCombo);
     }
 
     private void AddGroup_Click(object sender, RoutedEventArgs e)
@@ -1024,6 +1067,17 @@ public partial class SonolumeView : UserControl
             FontSize = 10,
             VerticalAlignment = VerticalAlignment.Center,
             Foreground = MutedBrush,
+            Margin = new Thickness(6, 0, 0, 0),
+        };
+        DockPanel.SetDock(chevron, Dock.Right);
+
+        var icon = new TextBlock
+        {
+            Text = "\uE945",
+            FontFamily = (FontFamily)owner.FindResource("IconFontFamily"),
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center,
+            Foreground = MutedBrush,
             Margin = new Thickness(0, 0, 6, 0),
         };
 
@@ -1032,11 +1086,13 @@ public partial class SonolumeView : UserControl
 
         var headerRow = new DockPanel();
         headerRow.Children.Add(chevron);
+        headerRow.Children.Add(icon);
         headerRow.Children.Add(headerText);
 
         var header = new Border
         {
-            Margin = new Thickness(-8, -6, -8, effectSectionExpanded ? 10 : 0),
+            Margin = new Thickness(-12, -12, -12, effectSectionExpanded ? 10 : -12),
+            CornerRadius = new CornerRadius(8, 8, 6, 6),
             Cursor = Cursors.Hand,
             Child = headerRow,
         };
@@ -1045,7 +1101,7 @@ public partial class SonolumeView : UserControl
         {
             effectSectionExpanded = !effectSectionExpanded;
             content.Visibility = effectSectionExpanded ? Visibility.Visible : Visibility.Collapsed;
-            header.Margin = new Thickness(-8, -6, -8, effectSectionExpanded ? 10 : 0);
+            header.Margin = new Thickness(-12, -12, -12, effectSectionExpanded ? 10 : -12);
             chevron.Text = effectSectionExpanded ? "" : "";
         };
 
@@ -1069,18 +1125,55 @@ public partial class SonolumeView : UserControl
         _ => id.ToString(),
     };
 
+    private static string? DisplayIcon(ParamId id) => id switch
+    {
+        ParamId.Hue => "",
+        ParamId.Saturation => "",
+        ParamId.Brightness => "",
+        ParamId.EffectIntensity => "",
+        ParamId.EffectSpeed => "",
+        ParamId.EffectDecay => "",
+        ParamId.PosX or ParamId.PosY => "",
+        _ => null,
+    };
+
     private UIElement BuildSliderRow(ParamId id, ParamSet values, Action<ParamId, float> onChange)
     {
         var info = ParamInfos.Of(id);
-        var row = new DockPanel { Margin = new Thickness(0, 0, 0, 10) };
-        var label = new TextBlock { Text = DisplayName(id), Width = 60, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
-        var valueText = new TextBlock { Width = 50, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush, Text = FmtSlider(id, info, values[id]) };
+        var stack = new StackPanel();
+
+        var headerRow = new DockPanel();
+        if (DisplayIcon(id) is string glyph)
+        {
+            var icon = new TextBlock
+            {
+                Text = glyph,
+                FontFamily = (FontFamily)FindResource("IconFontFamily"),
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = MutedBrush,
+                Margin = new Thickness(0, 0, 5, 0),
+            };
+            DockPanel.SetDock(icon, Dock.Left);
+            headerRow.Children.Add(icon);
+        }
+        var label = new TextBlock { Text = DisplayName(id), VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
+        DockPanel.SetDock(label, Dock.Left);
+        headerRow.Children.Add(label);
+
+        if (id is not ParamId.PaletteIndex) // no effect reads this yet - not worth mapping either
+        {
+            var macroLabel = BuildMacroLabel(DefaultMacros.SlotFor(id));
+            DockPanel.SetDock(macroLabel, Dock.Right);
+            headerRow.Children.Add(macroLabel);
+        }
+
         var slider = new Slider
         {
             Minimum = info.Min,
             Maximum = info.Max,
             Value = values[id],
-            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 8, 0, 0),
             IsEnabled = id is not ParamId.PaletteIndex, // no effect reads this yet
         };
         if (id == ParamId.EffectDecay)
@@ -1088,37 +1181,68 @@ public partial class SonolumeView : UserControl
             slider.IsSnapToTickEnabled = true;
             slider.TickFrequency = 0.01f;
         }
+
+        var hoverText = new TextBlock { Foreground = MutedBrush, Text = FmtSlider(id, info, values[id]) };
+        var hoverBorder = new Border
+        {
+            Background = Brushes.Black,
+            CornerRadius = new CornerRadius(4),
+            Padding = new Thickness(6, 2, 6, 2),
+            Child = hoverText,
+        };
+        var hoverPopup = new Popup
+        {
+            PlacementTarget = slider,
+            Placement = PlacementMode.Relative,
+            IsHitTestVisible = false,
+            AllowsTransparency = true,
+            Child = hoverBorder,
+        };
+
+        // The theme's Slider template (DarkTheme.xaml) names its Track "PART_Track" - the contract Slider's own
+        // template-lookup requires - so Track.Thumb gets us the actual dragged thumb without a manual visual-tree walk.
+        void UpdateHoverPosition()
+        {
+            slider.ApplyTemplate();
+            if (slider.Template.FindName("PART_Track", slider) is not Track track) return;
+            var thumb = track.Thumb;
+            var topLeft = thumb.TranslatePoint(new Point(0, 0), slider);
+            hoverPopup.HorizontalOffset = topLeft.X + thumb.ActualWidth / 2 - hoverBorder.ActualWidth / 2;
+            hoverPopup.VerticalOffset = topLeft.Y - hoverBorder.ActualHeight - 4;
+        }
+
+        // The Slider template's Thumb still raises Drag* even though Track consumes DragDelta itself, so this is
+        // the only reliable "is the user actively dragging" signal - IsMouseCaptureWithin also fires on a plain click.
+        slider.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler((_, _) =>
+        {
+            hoverPopup.IsOpen = true;
+            UpdateHoverPosition();
+        }), true);
+        slider.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, _) => hoverPopup.IsOpen = false), true);
+
         slider.ValueChanged += (_, e) =>
         {
             float value = id == ParamId.EffectDecay ? SnapToStep((float)e.NewValue, 0.01f) : (float)e.NewValue;
-            valueText.Text = FmtSlider(id, info, value);
+            hoverText.Text = FmtSlider(id, info, value);
+            if (hoverPopup.IsOpen) UpdateHoverPosition();
             if (suppressParamsRefresh) return; // this move came from RefreshOpenPanel echoing a live value, not the user
             onChange(id, value);
         };
 
-        DockPanel.SetDock(label, Dock.Left);
-        row.Children.Add(label);
+        stack.Children.Add(headerRow);
+        stack.Children.Add(slider);
 
-        if (id is not ParamId.PaletteIndex) // no effect reads this yet - not worth mapping either
-        {
-            var macroLabel = BuildMacroLabel(DefaultMacros.SlotFor(id));
-            DockPanel.SetDock(macroLabel, Dock.Right);
-            row.Children.Add(macroLabel);
-        }
+        var container = new Border { Padding = new Thickness(4, 8, 4, 8), Margin = new Thickness(0, 0, 0, 4), Child = stack };
 
-        DockPanel.SetDock(valueText, Dock.Right);
-        row.Children.Add(valueText);
-        row.Children.Add(slider);
-
-        if (id is not ParamId.PaletteIndex) paramSliders[id] = (slider, valueText); // PaletteIndex's slider is disabled anyway
-        return row;
+        if (id is not ParamId.PaletteIndex) paramSliders[id] = (slider, hoverText); // PaletteIndex's slider is disabled anyway
+        return container;
     }
 
     private static readonly Brush MacroLabelPillBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x30, 0x30, 0x38)));
 
     /// <summary>Shows which host macro drives a param or select mapping - fixed by <see cref="DefaultMacros"/>,
-    /// never user-editable, so this is a plain pill badge where a picker combo used to sit. Sized to its own text
-    /// ("CC 00".."CC 09"), not a fixed width, so it takes no more of the row than it needs.</summary>
+    /// never user-editable, so this is a plain pill badge where a picker combo used to sit. Fixed width (rather
+    /// than sized to "CC 00".."CC 09") so every row's pill lines up regardless of slot number.</summary>
     private static Border BuildMacroLabel(int slot) => new()
     {
         Child = new TextBlock
@@ -1131,6 +1255,8 @@ public partial class SonolumeView : UserControl
         CornerRadius = new CornerRadius(10),
         Padding = new Thickness(8, 2, 8, 2),
         Margin = new Thickness(6, 0, 0, 0),
+        Width = 56,
+        HorizontalAlignment = HorizontalAlignment.Right,
         VerticalAlignment = VerticalAlignment.Center,
     };
 
@@ -1353,8 +1479,11 @@ public partial class SonolumeView : UserControl
         return labels;
     }
 
-    // Trims the "ch*" (any-channel wildcard) suffix SourceAddress.ToString() adds by default, since it's
-    // noise for a label where the channel is almost never pinned to something specific.
-    private static string FormatSource(string source) =>
-        source.EndsWith(" ch*", StringComparison.Ordinal) ? source[..^4] : source;
+    // Always trims the trailing " chN"/" ch*" channel suffix SourceAddress.ToString() adds - the Key row's
+    // Channel combo is the one place that shows the channel, so it'd be redundant noise here.
+    private static string FormatSource(string source)
+    {
+        int i = source.LastIndexOf(" ch", StringComparison.Ordinal);
+        return i < 0 ? source : source[..i];
+    }
 }

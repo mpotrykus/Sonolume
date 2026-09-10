@@ -27,7 +27,7 @@ public sealed class Engine
     {
         Effects = effects ?? EffectRegistry.CreateDefault();
         InstanceId = instanceId ?? Guid.NewGuid().ToString("N")[..8];
-        DefaultMacros.BackfillIfMissing(project);
+        DefaultMacros.Sync(project);
         Project = project;
         mappingEngine = new MappingEngine(project.Mappings);
         compositor = new Compositor(project, Effects);
@@ -47,7 +47,7 @@ public sealed class Engine
 
     public void LoadProject(Project project)
     {
-        DefaultMacros.BackfillIfMissing(project);
+        DefaultMacros.Sync(project);
         Project = project;
         RebuildRuntime();
     }

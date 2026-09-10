@@ -8,8 +8,8 @@ public sealed class Zone
     public string Id { get; set; } = "";
     public string Name { get; set; } = "";
     public RectF Rect { get; set; } = new(0f, 0f, 1f, 1f);
-    public int CellsW { get; set; } = 1;
-    public int CellsH { get; set; } = 1;
+    public int CellsW { get; set; } = 10;
+    public int CellsH { get; set; } = 10;
     public bool InvertX { get; set; }
     public bool InvertY { get; set; }
     /// <summary>Clockwise rotation of the zone's rendered content, in degrees. Any value is allowed; angles that

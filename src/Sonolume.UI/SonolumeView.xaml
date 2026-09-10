@@ -37,39 +37,27 @@
                 <TextBox x:Name="ProjectNameBox" DockPanel.Dock="Left" Width="160" Margin="16,0,0,0" VerticalAlignment="Center"
                          LostFocus="ProjectNameBox_Commit" KeyDown="ProjectNameBox_KeyDown" />
 
-                <Button x:Name="RedoButton" DockPanel.Dock="Right" Margin="6,0,0,0" Click="Redo_Click" ToolTip="Redo">
+                <Button x:Name="RedoButton" DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Margin="6,0,0,0" Click="Redo_Click" ToolTip="Redo">
                     <TextBlock Text="&#xE7A6;" Style="{StaticResource IconGlyphStyle}" />
                 </Button>
-                <Button x:Name="UndoButton" DockPanel.Dock="Right" Click="Undo_Click" ToolTip="Undo">
+                <Button x:Name="UndoButton" DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Click="Undo_Click" ToolTip="Undo">
                     <TextBlock Text="&#xE7A7;" Style="{StaticResource IconGlyphStyle}" />
                 </Button>
                 <Border DockPanel.Dock="Right" Style="{StaticResource VerticalDividerStyle}" />
 
-                <Button x:Name="SaveButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButtonStyle}" Margin="6,0,0,0" Click="Save_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE74E;" Style="{StaticResource IconGlyphStyle}" Foreground="White" />
-                        <TextBlock Text="Save" Margin="6,0,0,0" />
-                    </StackPanel>
+                <Button x:Name="SaveButton" DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Margin="6,0,0,0" Click="Save_Click" ToolTip="Save">
+                    <TextBlock Text="&#xE74E;" Style="{StaticResource IconGlyphStyle}" />
                 </Button>
-                <Button DockPanel.Dock="Right" Click="SaveAs_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE792;" Style="{StaticResource IconGlyphStyle}" />
-                        <TextBlock Text="Save As..." Margin="6,0,0,0" />
-                    </StackPanel>
+                <Button DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Click="SaveAs_Click" ToolTip="Save As...">
+                    <TextBlock Text="&#xE792;" Style="{StaticResource IconGlyphStyle}" />
                 </Button>
                 <Border DockPanel.Dock="Right" Style="{StaticResource VerticalDividerStyle}" />
 
-                <Button DockPanel.Dock="Right" Margin="6,0,0,0" Click="Open_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE8E5;" Style="{StaticResource IconGlyphStyle}" />
-                        <TextBlock Text="Open..." Margin="6,0,0,0" />
-                    </StackPanel>
+                <Button DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Margin="6,0,0,0" Click="Open_Click" ToolTip="Open...">
+                    <TextBlock Text="&#xE8B7;" Style="{StaticResource IconGlyphStyle}" />
                 </Button>
-                <Button DockPanel.Dock="Right" Click="New_Click">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="&#xE7C3;" Style="{StaticResource IconGlyphStyle}" />
-                        <TextBlock Text="New" Margin="6,0,0,0" />
-                    </StackPanel>
+                <Button DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Click="New_Click" ToolTip="New">
+                    <TextBlock Text="&#xE7C3;" Style="{StaticResource IconGlyphStyle}" />
                 </Button>
             </DockPanel>
             <Border Style="{StaticResource HorizontalDividerStyle}" Margin="0,16,0,0" />
@@ -155,11 +143,11 @@
                     <local:PreviewControl x:Name="Preview" Grid.Row="0" />
 
                     <StackPanel Grid.Row="1" Margin="0,4,0,0">
-                        <Border x:Name="KeyboardHeader" Style="{StaticResource CollapsibleHeaderBorderStyle}" Margin="-8,0,-8,0"
+                        <Border x:Name="KeyboardHeader" Style="{StaticResource CollapsibleHeaderBorderStyle}" Background="Transparent" Margin="-8,0,-4,-4"
                                 Cursor="Hand" MouseLeftButtonUp="KeyboardHeader_MouseLeftButtonUp">
                             <DockPanel>
                                 <TextBlock x:Name="KeyboardChevron" Text="&#xE70D;" FontFamily="{StaticResource IconFontFamily}" FontSize="10"
-                                           VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" Margin="0,0,6,0" />
+                                           VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" DockPanel.Dock="Right" Margin="6,0,0,0" />
                                 <TextBlock Text="Keyboard" Style="{StaticResource SectionHeaderTextStyle}" />
                                 <TextBlock x:Name="KeyboardNoteText" VerticalAlignment="Center" Margin="8,0,6,0" TextAlignment="Right" Foreground="{StaticResource KeyLabelBrush}" />
                             </DockPanel>
@@ -208,6 +196,13 @@
                             <DockPanel Margin="0,0,0,16">
                                 <TextBlock Text="Key" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
                                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                    <ComboBox x:Name="ZoneChannelCombo" Margin="0,0,6,0" SelectionChanged="ChannelCombo_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Label}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
                                     <Button x:Name="ZoneLearnKeyButton" Content="Learn" Padding="10,2" Click="LearnKeyButton_Click" />
                                     <Button x:Name="ZoneClearKeyButton" Content="Clear" Padding="10,2" Margin="6,0,0,0" Click="ClearKeyButton_Click" />
                                 </StackPanel>
@@ -229,6 +224,13 @@
                             <DockPanel Margin="0,0,0,16">
                                 <TextBlock Text="Key" Width="72" Style="{StaticResource FieldLabelTextStyle}" />
                                 <StackPanel Orientation="Horizontal" DockPanel.Dock="Right">
+                                    <ComboBox x:Name="GroupChannelCombo" Margin="0,0,6,0" SelectionChanged="ChannelCombo_SelectionChanged">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <TextBlock Text="{Binding Label}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
                                     <Button x:Name="GroupLearnKeyButton" Content="Learn" Padding="10,2" Click="LearnKeyButton_Click" />
                                     <Button x:Name="GroupClearKeyButton" Content="Clear" Padding="10,2" Margin="6,0,0,0" Click="ClearKeyButton_Click" />
                                 </StackPanel>
@@ -236,12 +238,15 @@
                             </DockPanel>
                         </StackPanel>
 
-                        <Border x:Name="ZoneGeometryBorder" Visibility="Collapsed" Style="{StaticResource GroupBorderStyle}" Margin="0,12,0,12" Padding="12">
+                        <Border x:Name="ZoneGeometryBorder" Visibility="Collapsed" Style="{StaticResource GroupBorderStyle}" Margin="0,12,0,0" Padding="12">
                             <StackPanel>
-                                <Border x:Name="ZoneGeometryHeader" Style="{StaticResource CollapsibleHeaderBorderStyle}" Margin="-8,-6,-8,0"
+                                <Border x:Name="ZoneGeometryHeader" Style="{StaticResource CollapsibleHeaderBorderStyle}" Margin="-12,-12,-12,-12"
+                                        CornerRadius="8,8,6,6"
                                         Cursor="Hand" MouseLeftButtonUp="ZoneGeometryHeader_MouseLeftButtonUp">
                                     <DockPanel>
                                         <TextBlock x:Name="ZoneGeometryChevron" Text="&#xE70D;" FontFamily="{StaticResource IconFontFamily}" FontSize="10"
+                                                   VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" DockPanel.Dock="Right" Margin="6,0,0,0" />
+                                        <TextBlock Text="&#xE7C2;" FontFamily="{StaticResource IconFontFamily}" FontSize="13"
                                                    VerticalAlignment="Center" Foreground="{StaticResource MutedForegroundBrush}" Margin="0,0,6,0" />
                                         <TextBlock Text="Transform" Style="{StaticResource SectionHeaderTextStyle}" />
                                     </DockPanel>

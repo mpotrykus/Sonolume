@@ -82,7 +82,7 @@
     <!-- Icon glyph, paired with a text label inside button content -->
     <Style x:Key="IconGlyphStyle" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}" />
-        <Setter Property="FontSize" Value="13" />
+        <Setter Property="FontSize" Value="17" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
 
@@ -164,12 +164,12 @@
     <!-- Clickable header row of a GroupBorderStyle disclosure section; bleeds slightly into the group's own
          padding so the hover highlight reads as a real button instead of floating inside a flat card. -->
     <Style x:Key="CollapsibleHeaderBorderStyle" TargetType="Border">
-        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Background" Value="#26000000" />
         <Setter Property="CornerRadius" Value="6" />
-        <Setter Property="Padding" Value="8,6" />
+        <Setter Property="Padding" Value="12,10,12,14" />
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{StaticResource InputBackgroundHoverBrush}" />
+                <Setter Property="Background" Value="#3A000000" />
             </Trigger>
         </Style.Triggers>
     </Style>
@@ -275,6 +275,37 @@
         <Setter Property="Height" Value="26" />
         <Setter Property="FontFamily" Value="{StaticResource IconFontFamily}" />
         <Setter Property="FontSize" Value="12" />
+    </Style>
+
+    <!-- Borderless button showing only its icon glyph, e.g. header file-operation buttons -->
+    <Style x:Key="PlainIconButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Padding" Value="8" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="HorizontalContentAlignment" Value="Center" />
+        <Setter Property="VerticalContentAlignment" Value="Center" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border Background="Transparent">
+                        <ContentPresenter Margin="{TemplateBinding Padding}"
+                                          HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                          VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                          RecognizesAccessKey="True" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource DisabledForegroundBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <Style x:Key="ToggleIconButtonStyle" TargetType="ToggleButton">
@@ -592,13 +623,13 @@
                                 <RepeatButton Style="{StaticResource SliderRepeatButtonStyle}" Background="{StaticResource AccentBrush}" Command="Slider.DecreaseLarge" />
                             </Track.DecreaseRepeatButton>
                             <Track.IncreaseRepeatButton>
-                                <RepeatButton Style="{StaticResource SliderRepeatButtonStyle}" Background="Transparent" Command="Slider.IncreaseLarge" />
+                                <RepeatButton Style="{StaticResource SliderRepeatButtonStyle}" Background="{StaticResource InputBorderBrush}" Command="Slider.IncreaseLarge" />
                             </Track.IncreaseRepeatButton>
                             <Track.Thumb>
                                 <Thumb Width="15" Height="15" Focusable="False">
                                     <Thumb.Template>
                                         <ControlTemplate TargetType="Thumb">
-                                            <Ellipse Fill="{StaticResource AccentBrush}" Stroke="#33000000" StrokeThickness="1" />
+                                            <Ellipse Fill="White" Stroke="#33000000" StrokeThickness="1" />
                                         </ControlTemplate>
                                     </Thumb.Template>
                                 </Thumb>

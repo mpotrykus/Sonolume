@@ -225,6 +225,26 @@ public sealed class SonolumeSession : IDisposable
         });
     }
 
+    /// <summary>Sets the MIDI channel <paramref name="target"/>'s Key mapping(s) must match -
+    /// <see cref="SourceAddress.Any"/> for "any channel" (the default until the user picks one), or a specific
+    /// 0-based channel. Trigger/Gate only, same filter as <see cref="SetEffect"/>; no-op if there's no Key mapping
+    /// yet or every match already has this channel.</summary>
+    public void SetKeyChannel(TargetRef target, int channel)
+    {
+        var matching = GetProjectCopy().Mappings.Where(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate).ToList();
+        if (matching.Count == 0) return;
+        if (matching.All(m => m.Source.Channel == channel)) return;
+
+        MutateWithUndo(e =>
+        {
+            foreach (var m in e.Project.Mappings)
+            {
+                if (m.Target != target || m.Mode is not (MappingMode.Trigger or MappingMode.Gate)) continue;
+                m.Source = m.Source with { Channel = channel };
+            }
+        });
+    }
+
     /// <summary>Arms the engine to turn the next matching MIDI event into a mapping targeting
     /// <paramref name="target"/>. Not undoable itself; <see cref="PollLearn"/> folds the result in once it lands.</summary>
     public void BeginLearn(TargetRef target, ParamId param, MappingMode mode, string? effectId = null)

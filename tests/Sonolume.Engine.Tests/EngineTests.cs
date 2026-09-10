@@ -349,7 +349,9 @@ public class EngineTests
     /// resolved through a Set-mode Mapping, on a zone with no Trigger/Gate mapping (so it isn't event-driven and
     /// isn't scaled by any effect's captured level) - isolating whether that path works at all, independent of
     /// REAPER/AudioPlugSharp and independent of the Solid-effect level-compositing that confounds testing on the
-    /// default kit's zones.</summary>
+    /// default kit's zones. The Brightness mapping itself comes from <see cref="DefaultMacros"/> (via
+    /// <see cref="Engine"/>'s constructor syncing every zone/group to the fixed convention), not a hand-built
+    /// Mapping, since that convention is what actually decides which slot drives Brightness.</summary>
     [Fact]
     public void HostMacroSet_ControlsBrightness_OnNonEventDrivenZone()
     {
@@ -358,21 +360,13 @@ public class EngineTests
         zone.Params[ParamId.Hue] = 0f;
         zone.Params[ParamId.Saturation] = 1f;
         project.Zones.Add(zone);
-        project.Mappings.Add(new Mapping
-        {
-            Id = "macro-brightness",
-            Source = SourceAddress.HostMacro(0),
-            Target = TargetRef.Zone("z1"),
-            Param = ParamId.Brightness,
-            Mode = MappingMode.Set,
-            Transform = Transform.Identity,
-        });
 
         var engine = new Engine(project, instanceId: "macro0001");
         engine.Tick(0f);
         engine.TakeFrame(full: true);
 
-        engine.PushControl(new ControlEvent(SourceAddress.HostMacro(0), ControlEventType.Set, 0.3f, 0));
+        int brightnessSlot = DefaultMacros.SlotFor(ParamId.Brightness);
+        engine.PushControl(new ControlEvent(SourceAddress.HostMacro(brightnessSlot), ControlEventType.Set, 0.3f, 0));
         engine.Tick(0f);
 
         var c = KickColorOf(engine, "z1");
