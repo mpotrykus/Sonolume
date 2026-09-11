@@ -45,6 +45,11 @@ public sealed class PreviewControl : FrameworkElement
     private RectF? liveDragRect;
     private float? liveDragRotation;
 
+    public PreviewControl()
+    {
+        Focusable = true;
+    }
+
     public EngineSnapshot? Snapshot
     {
         get => snapshot;
@@ -244,6 +249,7 @@ public sealed class PreviewControl : FrameworkElement
     {
         base.OnMouseLeftButtonDown(e);
         if (!editable || snapshot is null) return;
+        Focus();
         var pos = e.GetPosition(this);
 
         if (selectedZoneId is { } selId)

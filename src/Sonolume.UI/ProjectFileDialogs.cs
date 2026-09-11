@@ -11,10 +11,17 @@ public static class ProjectFileDialogs
     {
         var dialog = new OpenFileDialog { Filter = "Sonolume project (*.sonolume.json)|*.sonolume.json|JSON (*.json)|*.json|All files|*.*" };
         if (dialog.ShowDialog(owner) != true) return;
+        OpenPath(owner, session, dialog.FileName);
+    }
+
+    /// <summary>Shared by <see cref="Open"/> and the "Open Recent" submenu, so both feed the same recent-files list.</summary>
+    public static void OpenPath(Window owner, SonolumeSession session, string path)
+    {
         try
         {
-            session.ImportProjectJson(File.ReadAllText(dialog.FileName));
-            session.CurrentFilePath = dialog.FileName;
+            session.ImportProjectJson(File.ReadAllText(path));
+            session.CurrentFilePath = path;
+            RecentFiles.Add(path);
         }
         catch (Exception ex)
         {
@@ -37,6 +44,7 @@ public static class ProjectFileDialogs
             string json = session.ExportProjectJson();
             File.WriteAllText(session.CurrentFilePath, json);
             session.MarkSaved(json);
+            RecentFiles.Add(session.CurrentFilePath);
         }
         catch (Exception ex)
         {
@@ -54,6 +62,7 @@ public static class ProjectFileDialogs
             File.WriteAllText(dialog.FileName, json);
             session.CurrentFilePath = dialog.FileName;
             session.MarkSaved(json);
+            RecentFiles.Add(dialog.FileName);
         }
         catch (Exception ex)
         {

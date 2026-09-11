@@ -460,6 +460,60 @@
         </Setter>
     </Style>
 
+    <!-- Hamburger menu (toolbar's "everything but undo/redo" dropdown) -->
+    <Style x:Key="AppMenuItemStyle" TargetType="MenuItem">
+        <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+        <Setter Property="Padding" Value="10,7" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="Border" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                        <DockPanel LastChildFill="True">
+                            <ContentPresenter DockPanel.Dock="Left" ContentSource="Icon" Width="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                            <ContentPresenter ContentSource="Header" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                        </DockPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Border" Property="Background" Value="{StaticResource InputBackgroundHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Foreground" Value="{StaticResource DisabledForegroundBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="AppMenuSeparatorStyle" TargetType="Separator">
+        <Setter Property="Margin" Value="4,6" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Border Height="1" Background="{StaticResource InputBorderBrush}" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="AppContextMenuStyle" TargetType="ContextMenu">
+        <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />
+        <Setter Property="Padding" Value="6" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border Background="{StaticResource PanelBackgroundGradientBrush}" BorderBrush="{StaticResource InputBorderBrush}"
+                            BorderThickness="1" CornerRadius="10" Padding="{TemplateBinding Padding}" Effect="{StaticResource PanelShadowEffect}"
+                            SnapsToDevicePixels="True">
+                        <StackPanel IsItemsHost="True" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- CheckBox -->
     <Style TargetType="CheckBox">
         <Setter Property="Foreground" Value="{StaticResource ForegroundBrush}" />

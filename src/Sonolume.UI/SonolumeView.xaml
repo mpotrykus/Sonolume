@@ -37,27 +37,57 @@
                 <TextBox x:Name="ProjectNameBox" DockPanel.Dock="Left" Width="160" Margin="16,0,0,0" VerticalAlignment="Center"
                          LostFocus="ProjectNameBox_Commit" KeyDown="ProjectNameBox_KeyDown" />
 
+                <Button x:Name="MenuButton" DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Click="MenuButton_Click" ToolTip="Menu">
+                    <TextBlock Text="&#xE700;" Style="{StaticResource IconGlyphStyle}" />
+                    <Button.ContextMenu>
+                        <ContextMenu Style="{StaticResource AppContextMenuStyle}">
+                            <MenuItem Header="New" Style="{StaticResource AppMenuItemStyle}" Click="New_Click">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE7C3;" Style="{StaticResource IconGlyphStyle}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Open..." Style="{StaticResource AppMenuItemStyle}" Click="Open_Click">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE8B7;" Style="{StaticResource IconGlyphStyle}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem x:Name="OpenRecentMenuItem" Header="Open Recent" Style="{StaticResource AppMenuItemStyle}" SubmenuOpened="OpenRecentMenuItem_SubmenuOpened">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE81C;" Style="{StaticResource IconGlyphStyle}" />
+                                </MenuItem.Icon>
+                                <MenuItem Header="(placeholder, populated on open)" />
+                            </MenuItem>
+                            <MenuItem x:Name="SaveMenuItem" Header="Save" Style="{StaticResource AppMenuItemStyle}" Click="Save_Click">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE74E;" Style="{StaticResource IconGlyphStyle}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem Header="Save As..." Style="{StaticResource AppMenuItemStyle}" Click="SaveAs_Click">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE792;" Style="{StaticResource IconGlyphStyle}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator Style="{StaticResource AppMenuSeparatorStyle}" />
+                            <MenuItem x:Name="ImportSignalRgbMenuItem" Header="Import from SignalRGB" Style="{StaticResource AppMenuItemStyle}" Click="ImportSignalRgb_Click">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE896;" Style="{StaticResource IconGlyphStyle}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem x:Name="ManualSignalRgbImportMenuItem" Header="Manual Import" Style="{StaticResource AppMenuItemStyle}" Click="ManualSignalRgbImport_Click">
+                                <MenuItem.Icon>
+                                    <TextBlock Text="&#xE70F;" Style="{StaticResource IconGlyphStyle}" />
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </Button.ContextMenu>
+                </Button>
+                <Border DockPanel.Dock="Right" Style="{StaticResource VerticalDividerStyle}" />
+
                 <Button x:Name="RedoButton" DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Margin="6,0,0,0" Click="Redo_Click" ToolTip="Redo">
                     <TextBlock Text="&#xE7A6;" Style="{StaticResource IconGlyphStyle}" />
                 </Button>
                 <Button x:Name="UndoButton" DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Click="Undo_Click" ToolTip="Undo">
                     <TextBlock Text="&#xE7A7;" Style="{StaticResource IconGlyphStyle}" />
-                </Button>
-                <Border DockPanel.Dock="Right" Style="{StaticResource VerticalDividerStyle}" />
-
-                <Button x:Name="SaveButton" DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Margin="6,0,0,0" Click="Save_Click" ToolTip="Save">
-                    <TextBlock Text="&#xE74E;" Style="{StaticResource IconGlyphStyle}" />
-                </Button>
-                <Button DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Click="SaveAs_Click" ToolTip="Save As...">
-                    <TextBlock Text="&#xE792;" Style="{StaticResource IconGlyphStyle}" />
-                </Button>
-                <Border DockPanel.Dock="Right" Style="{StaticResource VerticalDividerStyle}" />
-
-                <Button DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Margin="6,0,0,0" Click="Open_Click" ToolTip="Open...">
-                    <TextBlock Text="&#xE8B7;" Style="{StaticResource IconGlyphStyle}" />
-                </Button>
-                <Button DockPanel.Dock="Right" Style="{StaticResource PlainIconButtonStyle}" Click="New_Click" ToolTip="New">
-                    <TextBlock Text="&#xE7C3;" Style="{StaticResource IconGlyphStyle}" />
                 </Button>
             </DockPanel>
             <Border Style="{StaticResource HorizontalDividerStyle}" Margin="0,16,0,0" />

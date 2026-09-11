@@ -13,6 +13,7 @@ using Sonolume.Engine.Input;
 using Sonolume.Engine.Mappings;
 using Sonolume.Engine.Model;
 using Sonolume.Engine.Output;
+using Sonolume.Transport;
 
 namespace Sonolume.UI;
 
@@ -31,6 +32,12 @@ public partial class SonolumeView : UserControl
     private readonly DispatcherTimer editorTimer;
 
     private Project? projectSnapshot;
+
+    /// <summary>Canvas size from the last successful <see cref="ImportSignalRgb_Click"/>, used only to prefill
+    /// <see cref="ManualSignalRgbImport_Click"/>'s canvas fields (it rarely changes between devices). Null until
+    /// the first automatic import succeeds; the manual dialog works fine without it, just unprefilled.</summary>
+    private (float Width, float Height)? lastSignalRgbCanvasSize;
+
     private SelectionKind currentKind = SelectionKind.None;
     private string? currentId;
     private bool isRefreshingLists;
@@ -201,7 +208,7 @@ public partial class SonolumeView : UserControl
 
         UndoButton.IsEnabled = session.CanUndo;
         RedoButton.IsEnabled = session.CanRedo;
-        SaveButton.IsEnabled = session.HasUnsavedChanges;
+        SaveMenuItem.IsEnabled = session.HasUnsavedChanges;
 
         var zoneKeyLabels = BuildKeyLabels(project.Mappings, TargetKind.Zone);
         var groupKeyLabels = BuildKeyLabels(project.Mappings, TargetKind.Group);
@@ -920,6 +927,103 @@ public partial class SonolumeView : UserControl
         RefreshEditor();
     }
 
+    /// <summary>Rebuilds the "Open Recent" submenu each time it's opened, since <see cref="RecentFiles.Load"/>
+    /// prunes files that no longer exist and picks up anything opened/saved elsewhere since the menu was built.</summary>
+    private void OpenRecentMenuItem_SubmenuOpened(object sender, RoutedEventArgs e)
+    {
+        OpenRecentMenuItem.Items.Clear();
+        var paths = RecentFiles.Load();
+        if (paths.Count == 0)
+        {
+            OpenRecentMenuItem.Items.Add(new MenuItem { Header = "(No recent files)", Style = (Style)FindResource("AppMenuItemStyle"), IsEnabled = false });
+            return;
+        }
+        foreach (string path in paths)
+        {
+            var item = new MenuItem { Header = System.IO.Path.GetFileName(path), ToolTip = path, Style = (Style)FindResource("AppMenuItemStyle") };
+            item.Click += (_, _) => OpenRecentFile_Click(path);
+            OpenRecentMenuItem.Items.Add(item);
+        }
+    }
+
+    private void OpenRecentFile_Click(string path)
+    {
+        ProjectFileDialogs.OpenPath(OwnerWindow, session, path);
+        ClearSelection();
+        RefreshEditor();
+    }
+
+    private async void ImportSignalRgb_Click(object sender, RoutedEventArgs e)
+    {
+        ImportSignalRgbMenuItem.IsEnabled = false;
+        try
+        {
+            using var client = new SignalRgbMcpClient();
+            var result = await session.ImportSignalRgbLayoutAsync(client);
+            ClearSelection();
+            RefreshEditor();
+
+            if (result.CanvasWidth > 0 && result.CanvasHeight > 0)
+                lastSignalRgbCanvasSize = (result.CanvasWidth, result.CanvasHeight);
+
+            int count = result.Devices.Count;
+            string message = $"Imported {count} device{(count == 1 ? "" : "s")} from SignalRGB's current layout.";
+            if (result.SkippedMultiComponent.Count > 0)
+            {
+                message += "\n\nSkipped (SignalRGB doesn't expose an individual position for each of these controllers' several lighting components) - use Manual Import for these:\n"
+                    + string.Join('\n', result.SkippedMultiComponent.Select(name => $"• {name}"));
+            }
+            AppDialog.ShowMessage(OwnerWindow, message, "Import from SignalRGB");
+        }
+        catch (Exception ex)
+        {
+            AppDialog.ShowMessage(OwnerWindow, $"Could not import SignalRGB's layout:\n{ex.Message}", "Import from SignalRGB");
+        }
+        finally
+        {
+            ImportSignalRgbMenuItem.IsEnabled = true;
+        }
+    }
+
+    /// <summary>Opens <see cref="ManualSignalRgbImportDialog"/> and adds the entered zone the same way
+    /// <see cref="AddZone_Click"/> does - for a device/component the automatic import skipped (see its
+    /// "Skipped" list) because SignalRGB can't report an individual position for it.</summary>
+    private void ManualSignalRgbImport_Click(object sender, RoutedEventArgs e)
+    {
+        var entered = ManualSignalRgbImportDialog.Show(OwnerWindow, lastSignalRgbCanvasSize?.Width, lastSignalRgbCanvasSize?.Height);
+        if (entered is null) return;
+
+        var project = projectSnapshot ?? session.GetProjectCopy();
+        string id = Guid.NewGuid().ToString("N")[..8];
+        var zone = new Zone { Id = id, Name = entered.Name, Rect = entered.Rect, Rotation = entered.Rotation, ZIndex = project.Zones.Count };
+        try
+        {
+            session.AddZone(zone);
+        }
+        catch (Exception ex)
+        {
+            AppDialog.ShowMessage(OwnerWindow, ex.Message, "Manual import");
+            return;
+        }
+        RefreshEditor();
+        SelectZone(id);
+    }
+
+    /// <summary>Opens the hamburger menu's ContextMenu below the button - a Button's ContextMenu doesn't open on
+    /// a plain left click by default (only right-click/Apps-key), so this opens it explicitly instead. Custom
+    /// placement right-aligns the menu to the button so it expands leftward, since the button docks at the
+    /// window's right edge.</summary>
+    private void MenuButton_Click(object sender, RoutedEventArgs e)
+    {
+        var button = (Button)sender;
+        var menu = button.ContextMenu!;
+        menu.PlacementTarget = button;
+        menu.Placement = PlacementMode.Custom;
+        menu.CustomPopupPlacementCallback = (popupSize, targetSize, offset) =>
+            new[] { new CustomPopupPlacement(new Point(targetSize.Width - popupSize.Width, targetSize.Height), PopupPrimaryAxis.None) };
+        menu.IsOpen = true;
+    }
+
     private void Save_Click(object sender, RoutedEventArgs e) => ProjectFileDialogs.Save(OwnerWindow, session);
 
     private void SaveAs_Click(object sender, RoutedEventArgs e) => ProjectFileDialogs.SaveAs(OwnerWindow, session);
@@ -938,6 +1042,14 @@ public partial class SonolumeView : UserControl
 
     private void SonolumeView_PreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (Keyboard.Modifiers == ModifierKeys.None && e.Key == Key.Delete
+            && currentKind == SelectionKind.Zone && e.OriginalSource is not TextBoxBase)
+        {
+            RemoveZone_Click(sender, e);
+            e.Handled = true;
+            return;
+        }
+
         if (Keyboard.Modifiers != ModifierKeys.Control) return;
         if (e.Key == Key.Z) { session.Undo(); RefreshEditor(); e.Handled = true; }
         else if (e.Key == Key.Y) { session.Redo(); RefreshEditor(); e.Handled = true; }

@@ -126,7 +126,14 @@ public sealed class SonolumeSession : IDisposable
     public void AddZone(Zone zone) => MutateWithUndo(e =>
     {
         e.AddZone(zone);
-        var target = TargetRef.Zone(zone.Id);
+        AddDefaultMappings(e, TargetRef.Zone(zone.Id));
+    });
+
+    /// <summary>Wires the note-per-param convention (see <see cref="DefaultMacros"/>) plus a Gate "Key" mapping
+    /// on the target's auto-assigned octave, shared by every path that creates a zone or group (manual add,
+    /// SignalRGB import) so they all light up immediately the same way.</summary>
+    private static void AddDefaultMappings(Engine.Engine e, TargetRef target)
+    {
         foreach (var m in DefaultMacros.For(e.Project, target)) e.AddMapping(m);
         e.AddMapping(new Mapping
         {
@@ -138,7 +145,44 @@ public sealed class SonolumeSession : IDisposable
             EffectId = SolidEffect.TypeName,
             Transform = Transform.Identity,
         });
-    });
+    }
+
+    /// <summary>Fetches the current device layout from a locally running SignalRGB (via its MCP server) and
+    /// creates/updates one zone per unambiguously-positioned device, matched by a "signalrgb-{uid}" id so
+    /// re-importing after moving devices in SignalRGB's own Layout editor updates the same zones instead of
+    /// duplicating them. New zones get the same default mappings as a manually-added zone (see
+    /// <see cref="AddDefaultMappings"/>). Existing zones keep their id, group, params and mappings - only
+    /// position/name/rotation are refreshed. One undo entry for the whole import. Cell grid resolution is left at
+    /// each zone's default: SignalRGB's API exposes only a whole-device rect (position/size/rotation), not
+    /// per-LED layout. Multi-component controllers (a fan hub wired to several fans, say) are reported in the
+    /// result's <see cref="SignalRgbImportResult.SkippedMultiComponent"/> instead of being imported - see
+    /// <see cref="SignalRgbMcpClient.ReadDeviceLayoutsAsync"/> for why.</summary>
+    public async Task<SignalRgbImportResult> ImportSignalRgbLayoutAsync(SignalRgbMcpClient client, CancellationToken ct = default)
+    {
+        var result = await client.ReadDeviceLayoutsAsync(ct);
+        MutateWithUndo(e =>
+        {
+            foreach (var d in result.Devices)
+            {
+                string id = $"signalrgb-{d.Uid}";
+                if (e.Project.FindZone(id) is not null)
+                {
+                    e.UpdateZone(id, z =>
+                    {
+                        z.Name = d.Name;
+                        z.Rect = d.Rect;
+                        z.Rotation = d.Rotation;
+                    });
+                }
+                else
+                {
+                    e.AddZone(new Zone { Id = id, Name = d.Name, Rect = d.Rect, Rotation = d.Rotation });
+                    AddDefaultMappings(e, TargetRef.Zone(id));
+                }
+            }
+        });
+        return result;
+    }
 
     public void RemoveZone(string id) => MutateWithUndo(e => e.RemoveZone(id));
 
@@ -161,18 +205,7 @@ public sealed class SonolumeSession : IDisposable
     public void AddGroup(Group group) => MutateWithUndo(e =>
     {
         e.AddGroup(group);
-        var target = TargetRef.Group(group.Id);
-        foreach (var m in DefaultMacros.For(e.Project, target)) e.AddMapping(m);
-        e.AddMapping(new Mapping
-        {
-            Id = $"key-{Guid.NewGuid():N}",
-            Source = DefaultMacros.KeySourceOf(e.Project, target)!.Value,
-            Target = target,
-            Param = ParamId.EffectIntensity,
-            Mode = MappingMode.Gate,
-            EffectId = SolidEffect.TypeName,
-            Transform = Transform.Identity,
-        });
+        AddDefaultMappings(e, TargetRef.Group(group.Id));
     });
 
     public void RemoveGroup(string id) => MutateWithUndo(e => e.RemoveGroup(id));
