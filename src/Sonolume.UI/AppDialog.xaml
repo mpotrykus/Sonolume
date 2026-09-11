@@ -19,14 +19,21 @@
         </ResourceDictionary>
     </Window.Resources>
     <Grid x:Name="Backdrop" Background="#99000000" MouseDown="Backdrop_MouseDown">
-        <Border Style="{StaticResource PanelBorderStyle}" Width="380" Padding="24"
+        <Border Style="{StaticResource PanelBorderStyle}" Width="380"
                 HorizontalAlignment="Center" VerticalAlignment="Center" MouseDown="Card_MouseDown">
             <StackPanel>
-                <TextBlock x:Name="TitleText" Style="{StaticResource PanelHeaderTextStyle}" TextWrapping="Wrap" />
-                <TextBlock x:Name="MessageText" TextWrapping="Wrap" Margin="0,0,0,20" />
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button x:Name="CancelButton" Content="Cancel" Padding="16,7" Click="Cancel_Click" Visibility="Collapsed" />
-                    <Button x:Name="ConfirmButton" Content="OK" Style="{StaticResource PrimaryButtonStyle}" Padding="16,7" Margin="10,0,0,0" Click="Confirm_Click" />
+                <Border Style="{StaticResource ModalHeaderBorderStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="TitleIcon" Style="{StaticResource ModalHeaderIconStyle}" />
+                        <TextBlock x:Name="TitleText" Style="{StaticResource PanelHeaderTextStyle}" Margin="0" VerticalAlignment="Center" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+                <StackPanel Margin="24">
+                    <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,28,0,0">
+                        <Button x:Name="CancelButton" Content="Cancel" Padding="16,7" Click="Cancel_Click" Visibility="Collapsed" />
+                        <Button x:Name="ConfirmButton" Content="OK" Style="{StaticResource PrimaryButtonStyle}" Padding="16,7" Margin="10,0,0,0" Click="Confirm_Click" />
+                    </StackPanel>
                 </StackPanel>
             </StackPanel>
         </Border>

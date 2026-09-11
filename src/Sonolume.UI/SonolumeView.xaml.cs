@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -80,6 +81,7 @@ public partial class SonolumeView : UserControl
     private bool suppressBlendCombo;
 
     private bool suppressChannelCombo;
+    private bool suppressKeyOctaveCombo;
 
     private sealed record EffectOption(string Id, string Label);
 
@@ -104,6 +106,13 @@ public partial class SonolumeView : UserControl
         .. Enumerable.Range(0, 16).Select(channel => new ChannelOption(channel, $"CH {channel + 1}")),
     ];
 
+    private sealed record KeyOctaveOption(int Note, string Label);
+
+    // Every "C" note MIDI actually has room for: note 0 (C-1) through note 120 (C9, the last multiple of 12 that
+    // still fits in the 0-127 range) - one below the highest root note, C10, would need note 132.
+    private static readonly KeyOctaveOption[] KeyOctaveOptions =
+        Enumerable.Range(0, 11).Select(octave => new KeyOctaveOption(octave * 12, $"C{octave - 1}")).ToArray();
+
     private Window OwnerWindow => Window.GetWindow(this) ?? throw new InvalidOperationException("SonolumeView is not hosted in a Window.");
 
     public SonolumeView(SonolumeSession session)
@@ -115,6 +124,9 @@ public partial class SonolumeView : UserControl
         ZoneChannelCombo.SelectedIndex = 0;
         GroupChannelCombo.ItemsSource = ChannelOptions;
         GroupChannelCombo.SelectedIndex = 0;
+
+        ZoneKeyOctaveCombo.ItemsSource = KeyOctaveOptions;
+        GroupKeyOctaveCombo.ItemsSource = KeyOctaveOptions;
 
         Preview.Editable = true;
         Preview.ZoneClicked += id => session.SelectedZoneId = id;
@@ -185,24 +197,48 @@ public partial class SonolumeView : UserControl
             if (!ProjectNameBox.IsFocused) ProjectNameBox.Text = snapshot.ProjectName;
         }
 
-        StatusText.Text = Describe(session.Sink.Status);
-        MidiText.Text = $"MIDI: {session.Runner.ProcessedEvents} events" + (session.Runner.DroppedEvents > 0 ? $", {session.Runner.DroppedEvents} dropped" : "");
+        UpdateSinkStatus(session.Sink.Status);
+
+        MidiText.Inlines.Clear();
+        MidiText.Inlines.Add(new Run($"MIDI: {session.Runner.ProcessedEvents} events"));
+        if (session.Runner.DroppedEvents > 0)
+            MidiText.Inlines.Add(new Run($", {session.Runner.DroppedEvents} dropped") { Foreground = (Brush)FindResource("DangerBrush") });
     }
 
-    private static string Describe(SinkStatus status) => status.State switch
+    private void UpdateSinkStatus(SinkStatus status)
     {
-        SinkState.Connected => $"SignalRGB: connected  {status.LastSendMs:0.0} ms  {status.FramesSent} frames" + (status.FramesDropped > 0 ? $"  ({status.FramesDropped} dropped)" : ""),
-        SinkState.Offline => "SignalRGB: offline (is SignalRGB running?)",
-        SinkState.Error => $"SignalRGB: {status.Message}",
-        _ => "SignalRGB: connecting...",
+        StatusDot.Fill = status.State == SinkState.Connected ? LatencyBrush(status.LastSendMs) : Brushes.Transparent;
+        SignalRgbStatusPanel.ToolTip = status.State switch
+        {
+            SinkState.Connected => $"SignalRGB: connected ({LatencyLabel(status.LastSendMs)} latency)",
+            SinkState.Offline => "SignalRGB: offline (is SignalRGB running?)",
+            SinkState.Error => $"SignalRGB: {status.Message}",
+            _ => "SignalRGB: connecting...",
+        };
+        StatusMsText.Text = $"{status.LastSendMs:0.0} ms";
+        StatusFramesText.Text = $"{status.FramesSent} frames";
+        StatusDroppedText.Text = status.FramesDropped > 0 ? $"({status.FramesDropped} dropped)" : "";
+        StatusDroppedText.Foreground = status.FramesDropped > 0 ? (Brush)FindResource("DangerBrush") : (Brush)FindResource("MutedForegroundBrush");
+    }
+
+    private Brush LatencyBrush(double lastSendMs) => lastSendMs switch
+    {
+        <= 20 => (Brush)FindResource("SuccessBrush"),
+        <= 50 => (Brush)FindResource("WarningBrush"),
+        _ => (Brush)FindResource("DangerBrush"),
+    };
+
+    private static string LatencyLabel(double lastSendMs) => lastSendMs switch
+    {
+        <= 20 => "good",
+        <= 50 => "elevated",
+        _ => "high",
     };
 
     // --- Zone/group editor: bottom + right panels ---
 
     private void RefreshEditor()
     {
-        session.PollLearn();
-
         var project = session.GetProjectCopy();
         projectSnapshot = project;
 
@@ -282,7 +318,7 @@ public partial class SonolumeView : UserControl
                 suppressCombo = false;
             }
 
-            RefreshKeyControls(TargetRef.Zone(zone.Id), TargetKind.Zone, project, ZoneKeyText, ZoneLearnKeyButton, ZoneClearKeyButton, ZoneChannelCombo);
+            RefreshKeyControls(TargetRef.Zone(zone.Id), TargetKind.Zone, project, ZoneKeyOctaveCombo, ZoneChannelCombo);
             RefreshParamsLive(zone.Params);
             RefreshEffectKeyControls(TargetRef.Zone(zone.Id), project);
             RefreshBlendKeyControls(TargetRef.Zone(zone.Id), zone.Blend);
@@ -301,7 +337,7 @@ public partial class SonolumeView : UserControl
                 suppressCombo = false;
             }
 
-            RefreshKeyControls(TargetRef.Group(group.Id), TargetKind.Group, project, GroupKeyText, GroupLearnKeyButton, GroupClearKeyButton, GroupChannelCombo);
+            RefreshKeyControls(TargetRef.Group(group.Id), TargetKind.Group, project, GroupKeyOctaveCombo, GroupChannelCombo);
             RefreshParamsLive(group.Params);
             RefreshEffectKeyControls(TargetRef.Group(group.Id), project);
         }
@@ -365,51 +401,46 @@ public partial class SonolumeView : UserControl
         suppressParamsRefresh = false;
     }
 
-    /// <summary>Keeps a zone/group's "Key" row in sync with <see cref="SonolumeSession.PendingLearn"/> and
-    /// its current mapping(s), the same way <see cref="RefreshOpenPanel"/> keeps every other field in sync. The
-    /// channel combo mirrors the Key mapping(s)' <see cref="SourceAddress.Channel"/> directly (not through Learn),
-    /// the same live-editing pattern as <see cref="RefreshBlendKeyControls"/> - skipped while its dropdown is open,
-    /// guarded by <see cref="suppressChannelCombo"/> so pushing the value in doesn't loop back through
-    /// <see cref="ChannelCombo_SelectionChanged"/>.</summary>
-    private void RefreshKeyControls(TargetRef target, TargetKind kind, Project project, TextBlock keyText, Button learnButton, Button clearButton, ComboBox channelCombo)
+    /// <summary>Keeps a zone/group's "Key" row - the octave combo and the channel combo - in sync with its current
+    /// mapping(s), the same way <see cref="RefreshOpenPanel"/> keeps every other field in sync; both mirror the
+    /// Key mapping's <see cref="SourceAddress"/> directly, the same live-editing pattern as
+    /// <see cref="RefreshBlendKeyControls"/> - each skipped while its own dropdown is open, guarded by
+    /// <see cref="suppressKeyOctaveCombo"/>/<see cref="suppressChannelCombo"/> so pushing the value in doesn't loop
+    /// back through <see cref="KeyOctaveCombo_SelectionChanged"/>/<see cref="ChannelCombo_SelectionChanged"/>.</summary>
+    private void RefreshKeyControls(TargetRef target, TargetKind kind, Project project, ComboBox octaveCombo, ComboBox channelCombo)
     {
-        bool listening = session.IsPendingLearn(target, ParamId.EffectIntensity, MappingMode.Gate);
-        string? keyLabel = BuildKeyLabels(project.Mappings, kind).GetValueOrDefault(target.Id);
-        keyText.Text = listening ? "Listening..." : keyLabel ?? "(none)";
-        learnButton.Content = listening ? "Cancel" : "Learn";
-        clearButton.IsEnabled = !listening && keyLabel is not null;
+        var keyMapping = project.Mappings.FirstOrDefault(m => m.Enabled && m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate);
+
+        if (!octaveCombo.IsDropDownOpen)
+        {
+            suppressKeyOctaveCombo = true;
+            octaveCombo.SelectedItem = keyMapping is null ? null : ClosestKeyOctaveOption(keyMapping.Source.Number);
+            suppressKeyOctaveCombo = false;
+            octaveCombo.IsEnabled = keyMapping is not null;
+        }
 
         if (!channelCombo.IsDropDownOpen)
         {
-            int? channel = project.Mappings
-                .Where(m => m.Enabled && m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate)
-                .Select(m => (int?)m.Source.Channel).FirstOrDefault();
-
+            int? channel = keyMapping?.Source.Channel;
             suppressChannelCombo = true;
             channelCombo.SelectedItem = ChannelOptions.FirstOrDefault(o => o.Value == (channel ?? SourceAddress.Any)) ?? ChannelOptions[0];
             suppressChannelCombo = false;
-            channelCombo.IsEnabled = !listening && channel is not null;
+            channelCombo.IsEnabled = channel is not null;
         }
     }
 
-    private void LearnKeyButton_Click(object sender, RoutedEventArgs e)
+    // A pre-existing Key mapping's note is always an exact "C" (see DefaultMacros.KeySourceOf) unless it predates
+    // this convention (an older save learned onto some other note) - fall back to the nearest "C" rather than
+    // leaving the combo with no selection at all.
+    private static KeyOctaveOption ClosestKeyOctaveOption(int note) =>
+        KeyOctaveOptions.FirstOrDefault(o => o.Note == note)
+        ?? KeyOctaveOptions.OrderBy(o => Math.Abs(o.Note - note)).First();
+
+    private void KeyOctaveCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        var target = CurrentTarget();
-        if (target is null) return;
-
-        if (session.IsPendingLearn(target, ParamId.EffectIntensity, MappingMode.Gate)) session.CancelLearn();
-        else session.BeginLearn(target, ParamId.EffectIntensity, MappingMode.Gate, pendingEffectId);
-
-        RefreshOpenPanel(projectSnapshot ?? session.GetProjectCopy());
-    }
-
-    private void ClearKeyButton_Click(object sender, RoutedEventArgs e)
-    {
-        var target = CurrentTarget();
-        if (target is null) return;
-
-        session.RemoveMappingsForTarget(target);
-        RefreshEditor();
+        if (suppressKeyOctaveCombo) return;
+        if (CurrentTarget() is not { } target) return;
+        if (sender is ComboBox { SelectedItem: KeyOctaveOption option }) session.SetKeyOctave(target, option.Note);
     }
 
     private void ChannelCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -431,6 +462,7 @@ public partial class SonolumeView : UserControl
         currentKind = SelectionKind.None;
         currentId = null;
         session.SelectedZoneId = null;
+        UpdateRemoveButtonsEnabled();
         ZoneIdentityPanel.Visibility = Visibility.Collapsed;
         GroupIdentityPanel.Visibility = Visibility.Collapsed;
         ZoneGeometryBorder.Visibility = Visibility.Collapsed;
@@ -462,6 +494,13 @@ public partial class SonolumeView : UserControl
         currentKind = SelectionKind.Zone;
         currentId = row.Id;
         LoadZonePanel(row.Zone, projectSnapshot!);
+        UpdateRemoveButtonsEnabled();
+    }
+
+    private void UpdateRemoveButtonsEnabled()
+    {
+        RemoveZoneButton.IsEnabled = currentKind == SelectionKind.Zone;
+        RemoveGroupButton.IsEnabled = currentKind == SelectionKind.Group;
     }
 
     // --- Zone list drag-and-drop reordering (sets ZIndex to match the on-screen order) ---
@@ -539,6 +578,7 @@ public partial class SonolumeView : UserControl
         currentKind = SelectionKind.Group;
         currentId = row.Id;
         LoadGroupPanel(row.Group, projectSnapshot!);
+        UpdateRemoveButtonsEnabled();
     }
 
     private void SelectZone(string id)
@@ -552,6 +592,7 @@ public partial class SonolumeView : UserControl
         currentKind = SelectionKind.Zone;
         currentId = id;
         LoadZonePanel(row.Zone, projectSnapshot!);
+        UpdateRemoveButtonsEnabled();
     }
 
     private void SelectGroup(string id)
@@ -565,6 +606,7 @@ public partial class SonolumeView : UserControl
         currentKind = SelectionKind.Group;
         currentId = id;
         LoadGroupPanel(row.Group, projectSnapshot!);
+        UpdateRemoveButtonsEnabled();
     }
 
     // --- Zone panel ---
@@ -605,7 +647,7 @@ public partial class SonolumeView : UserControl
         RebuildParamsPanel(ParamsPanel, zone.Params, TargetRef.Zone(zoneId), (id, raw) => session.SetParam(TargetRef.Zone(zoneId), id, raw),
             BuildBlendRow(zone, TargetRef.Zone(zoneId), mode => CommitZoneUpdate(zoneId, z => z.Blend = mode)));
 
-        RefreshKeyControls(TargetRef.Zone(zoneId), TargetKind.Zone, project, ZoneKeyText, ZoneLearnKeyButton, ZoneClearKeyButton, ZoneChannelCombo);
+        RefreshKeyControls(TargetRef.Zone(zoneId), TargetKind.Zone, project, ZoneKeyOctaveCombo, ZoneChannelCombo);
     }
 
     private void ZoneGeometryHeader_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
@@ -798,7 +840,7 @@ public partial class SonolumeView : UserControl
         ParamsTitle.Visibility = Visibility.Visible;
         RebuildParamsPanel(ParamsPanel, group.Params, TargetRef.Group(groupId), (id, raw) => session.SetParam(TargetRef.Group(groupId), id, raw));
 
-        RefreshKeyControls(TargetRef.Group(groupId), TargetKind.Group, project, GroupKeyText, GroupLearnKeyButton, GroupClearKeyButton, GroupChannelCombo);
+        RefreshKeyControls(TargetRef.Group(groupId), TargetKind.Group, project, GroupKeyOctaveCombo, GroupChannelCombo);
     }
 
     private void AddGroup_Click(object sender, RoutedEventArgs e)

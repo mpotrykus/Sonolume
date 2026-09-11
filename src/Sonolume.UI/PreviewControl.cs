@@ -143,23 +143,33 @@ public sealed class PreviewControl : FrameworkElement
                     dc.DrawRectangle(brush, null, new Rect(rect.X + cx * cellW, rect.Y + cy * cellH, cellW + 0.5, cellH + 0.5));
                 }
             }
-            dc.Pop();
 
             bool isSelected = editable && zone.Id == selectedZoneId;
             dc.DrawRoundedRectangle(null, isSelected ? SelectedPen : OutlinePen, rect, ZoneCornerRadius, ZoneCornerRadius);
 
             if (ShowLabels)
             {
-                var text = new FormattedText(zone.Name, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, LabelTypeface, 11, LabelBrush, pixelsPerDip);
-                dc.DrawText(text, new Point(rect.X + 5, rect.Y + 3));
-
+                FormattedText? keyText = null;
+                double keyWidth = 0;
                 if (zoneKeyLabels.TryGetValue(zone.Id, out var keyLabel))
                 {
-                    var keyText = new FormattedText(keyLabel, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, LabelTypeface, 11, KeyLabelBrush, pixelsPerDip);
-                    dc.DrawText(keyText, new Point(rect.Right - 5 - keyText.Width, rect.Y + 3));
+                    keyText = new FormattedText(keyLabel, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, LabelTypeface, 11, KeyLabelBrush, pixelsPerDip);
+                    keyWidth = keyText.Width;
                 }
+
+                // Reserve the key label's own space so a long zone name ellipsizes instead of drawing over it.
+                var text = new FormattedText(zone.Name, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, LabelTypeface, 11, LabelBrush, pixelsPerDip)
+                {
+                    MaxTextWidth = Math.Max(1, rect.Width - 10 - (keyWidth > 0 ? keyWidth + 6 : 0)),
+                    Trimming = TextTrimming.CharacterEllipsis
+                };
+                dc.DrawText(text, new Point(rect.X + 5, rect.Y + 3));
+
+                if (keyText is not null)
+                    dc.DrawText(keyText, new Point(rect.Right - 5 - keyText.Width, rect.Y + 3));
             }
 
+            dc.Pop();
             if (rotated) dc.Pop();
         }
         dc.Pop();

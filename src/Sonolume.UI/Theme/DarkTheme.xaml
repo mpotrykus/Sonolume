@@ -13,6 +13,8 @@
     <Color x:Key="DangerColor">#E5484D</Color>
     <Color x:Key="DangerHoverColor">#F0605F</Color>
     <Color x:Key="DangerPressedColor">#C93B3B</Color>
+    <Color x:Key="SuccessColor">#3DD68C</Color>
+    <Color x:Key="WarningColor">#E5A93D</Color>
     <Color x:Key="ForegroundColor">#E6E6EA</Color>
     <Color x:Key="MutedForegroundColor">#9A9AA3</Color>
     <Color x:Key="DisabledForegroundColor">#5C5C66</Color>
@@ -27,6 +29,8 @@
     <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
     <SolidColorBrush x:Key="DangerHoverBrush" Color="{StaticResource DangerHoverColor}" />
     <SolidColorBrush x:Key="DangerPressedBrush" Color="{StaticResource DangerPressedColor}" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
     <SolidColorBrush x:Key="ForegroundBrush" Color="{StaticResource ForegroundColor}" />
     <SolidColorBrush x:Key="MutedForegroundBrush" Color="{StaticResource MutedForegroundColor}" />
     <SolidColorBrush x:Key="DisabledForegroundBrush" Color="{StaticResource DisabledForegroundColor}" />
@@ -143,6 +147,20 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- Full-width modal header bar: darker overlay than the panel body, nested just inside the
+         panel's own rounded corners (11 = panel's 12 minus its 1px border). -->
+    <Style x:Key="ModalHeaderBorderStyle" TargetType="Border">
+        <Setter Property="Background" Value="#33000000" />
+        <Setter Property="CornerRadius" Value="11,11,0,0" />
+        <Setter Property="Padding" Value="20,20" />
+    </Style>
+
+    <Style x:Key="ModalHeaderIconStyle" TargetType="TextBlock" BasedOn="{StaticResource IconGlyphStyle}">
+        <Setter Property="FontSize" Value="16" />
+        <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+        <Setter Property="Margin" Value="0,0,10,0" />
     </Style>
 
     <!-- Panel container -->
@@ -351,6 +369,60 @@
         </Setter>
     </Style>
 
+    <Style x:Key="ToggleSwitchStyle" TargetType="CheckBox">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="CheckBox">
+                    <Border x:Name="Track" Width="36" Height="20" CornerRadius="10"
+                            Background="{StaticResource InputBackgroundBrush}"
+                            BorderBrush="{StaticResource InputBorderBrush}" BorderThickness="1"
+                            SnapsToDevicePixels="True">
+                        <Ellipse x:Name="Thumb" Width="14" Height="14" Fill="{StaticResource MutedForegroundBrush}"
+                                 HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0">
+                            <Ellipse.RenderTransform>
+                                <TranslateTransform x:Name="ThumbTransform" X="0" />
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ThumbTransform" Storyboard.TargetProperty="X"
+                                                         To="16" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ThumbTransform" Storyboard.TargetProperty="X"
+                                                         To="0" Duration="0:0:0.12" />
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
+                            <Setter TargetName="Track" Property="Background" Value="{StaticResource AccentBrush}" />
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+                            <Setter TargetName="Thumb" Property="Fill" Value="White" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Track" Property="Effect" Value="{StaticResource AccentGlowEffect}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Track" Property="Background" Value="{StaticResource PanelBackgroundBrush}" />
+                            <Setter TargetName="Track" Property="Opacity" Value="0.6" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
         <Setter Property="Background" Value="{StaticResource AccentBrush}" />
         <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
@@ -468,18 +540,33 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="MenuItem">
-                    <Border x:Name="Border" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
-                        <DockPanel LastChildFill="True">
-                            <ContentPresenter DockPanel.Dock="Left" ContentSource="Icon" Width="20" Margin="0,0,10,0" VerticalAlignment="Center" />
-                            <ContentPresenter ContentSource="Header" VerticalAlignment="Center" RecognizesAccessKey="True" />
-                        </DockPanel>
-                    </Border>
+                    <Grid>
+                        <Border x:Name="Border" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}" SnapsToDevicePixels="True">
+                            <DockPanel LastChildFill="True">
+                                <ContentPresenter DockPanel.Dock="Left" ContentSource="Icon" Width="20" Margin="0,0,10,0" VerticalAlignment="Center" />
+                                <Path x:Name="SubmenuArrow" DockPanel.Dock="Right" Data="M0,0 L4,4 L0,8 Z" Fill="{StaticResource MutedForegroundBrush}"
+                                      Margin="10,0,0,0" VerticalAlignment="Center" Visibility="Collapsed" />
+                                <ContentPresenter ContentSource="Header" VerticalAlignment="Center" RecognizesAccessKey="True" />
+                            </DockPanel>
+                        </Border>
+                        <Popup x:Name="Submenu" Placement="Right" IsOpen="{TemplateBinding IsSubmenuOpen}"
+                               AllowsTransparency="True" Focusable="False" PopupAnimation="Fade">
+                            <Border Background="{StaticResource PanelBackgroundGradientBrush}" BorderBrush="{StaticResource InputBorderBrush}"
+                                    BorderThickness="1" CornerRadius="10" Padding="6" Effect="{StaticResource PanelShadowEffect}"
+                                    SnapsToDevicePixels="True">
+                                <StackPanel IsItemsHost="True" />
+                            </Border>
+                        </Popup>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsHighlighted" Value="True">
                             <Setter TargetName="Border" Property="Background" Value="{StaticResource InputBackgroundHoverBrush}" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Foreground" Value="{StaticResource DisabledForegroundBrush}" />
+                        </Trigger>
+                        <Trigger Property="HasItems" Value="True">
+                            <Setter TargetName="SubmenuArrow" Property="Visibility" Value="Visible" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

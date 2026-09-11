@@ -19,80 +19,87 @@
         </ResourceDictionary>
     </Window.Resources>
     <Grid x:Name="Backdrop" Background="#99000000" MouseDown="Backdrop_MouseDown">
-        <Border Style="{StaticResource PanelBorderStyle}" Width="420" Padding="24"
+        <Border Style="{StaticResource PanelBorderStyle}" Width="420"
                 HorizontalAlignment="Center" VerticalAlignment="Center" MouseDown="Card_MouseDown">
             <StackPanel>
-                <TextBlock Text="Manual Import from SignalRGB" Style="{StaticResource PanelHeaderTextStyle}" />
-                <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionTextStyle}" Margin="0,0,0,16"
-                           Text="For a device SignalRGB can't report a single position for (see the Skipped list after an automatic import). Open SignalRGB's Layout tab, select the component, and copy its X/Y/Width/Height/Rotation and the canvas size shown there." />
+                <Border Style="{StaticResource ModalHeaderBorderStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE70F;" Style="{StaticResource ModalHeaderIconStyle}" />
+                        <TextBlock Text="Manual Import from SignalRGB" Style="{StaticResource PanelHeaderTextStyle}" Margin="0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+                <StackPanel Margin="24">
+                    <TextBlock TextWrapping="Wrap" Style="{StaticResource CaptionTextStyle}" Margin="0,0,0,16"
+                               Text="Open SignalRGB's Layout tab, select the component, and copy its X/Y/Width/Height/Rotation and the canvas size shown there." />
 
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="100" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelTextStyle}" />
-                    <TextBox x:Name="NameBox" Grid.Column="1" Text="SignalRGB Device" />
-                </Grid>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Name" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBox x:Name="NameBox" Grid.Column="1" Text="SignalRGB Device" />
+                    </Grid>
 
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="100" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Position" Style="{StaticResource FieldLabelTextStyle}" />
-                    <TextBox x:Name="XBox" Grid.Column="1" ToolTip="X" />
-                    <TextBlock Grid.Column="3" Text="Y" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                    <TextBox x:Name="YBox" Grid.Column="4" ToolTip="Y" />
-                </Grid>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Position" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="X" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="XBox" Grid.Row="0" Grid.Column="2" ToolTip="X" />
+                        <TextBlock Grid.Row="0" Grid.Column="4" Text="Y" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="YBox" Grid.Row="0" Grid.Column="5" ToolTip="Y" />
 
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="100" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Size" Style="{StaticResource FieldLabelTextStyle}" />
-                    <TextBox x:Name="WidthBox" Grid.Column="1" ToolTip="Width" />
-                    <TextBlock Grid.Column="3" Text="H" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                    <TextBox x:Name="HeightBox" Grid.Column="4" ToolTip="Height" />
-                </Grid>
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Size" Style="{StaticResource FieldLabelTextStyle}" Margin="0,10,0,0" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="W" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,10,4,0" />
+                        <TextBox x:Name="WidthBox" Grid.Row="1" Grid.Column="2" ToolTip="Width" Margin="0,10,0,0" />
+                        <TextBlock Grid.Row="1" Grid.Column="4" Text="H" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,10,4,0" />
+                        <TextBox x:Name="HeightBox" Grid.Row="1" Grid.Column="5" ToolTip="Height" Margin="0,10,0,0" />
+                    </Grid>
 
-                <Grid Margin="0,0,0,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="100" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Rotation °" Style="{StaticResource FieldLabelTextStyle}" />
-                    <TextBox x:Name="RotationBox" Grid.Column="1" Text="0" ToolTip="Clockwise rotation, in degrees" />
-                </Grid>
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Rotation °" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBox x:Name="RotationBox" Grid.Column="1" Text="0" ToolTip="Clockwise rotation, in degrees" />
+                    </Grid>
 
-                <Border Style="{StaticResource HorizontalDividerStyle}" Margin="0,4,0,16" />
+                    <Border Style="{StaticResource HorizontalDividerStyle}" Margin="0,4,0,16" />
 
-                <Grid Margin="0,0,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="100" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="12" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" Text="Canvas Size" Style="{StaticResource FieldLabelTextStyle}" />
-                    <TextBox x:Name="CanvasWidthBox" Grid.Column="1" ToolTip="Canvas width" />
-                    <TextBlock Grid.Column="3" Text="H" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
-                    <TextBox x:Name="CanvasHeightBox" Grid.Column="4" ToolTip="Canvas height" />
-                </Grid>
+                    <Grid Margin="0,0,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="100" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Canvas Size" Style="{StaticResource FieldLabelTextStyle}" />
+                        <TextBlock Grid.Column="1" Text="W" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="CanvasWidthBox" Grid.Column="2" ToolTip="Canvas width" />
+                        <TextBlock Grid.Column="4" Text="H" Style="{StaticResource CaptionTextStyle}" VerticalAlignment="Center" Margin="0,0,4,0" />
+                        <TextBox x:Name="CanvasHeightBox" Grid.Column="5" ToolTip="Canvas height" />
+                    </Grid>
 
-                <TextBlock x:Name="ErrorText" TextWrapping="Wrap" Foreground="#FF6B6B" Margin="0,10,0,0" Visibility="Collapsed" />
+                    <TextBlock x:Name="ErrorText" TextWrapping="Wrap" Foreground="#FF6B6B" Margin="0,10,0,0" Visibility="Collapsed" />
 
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
-                    <Button x:Name="CancelButton" Content="Cancel" Padding="16,7" Click="Cancel_Click" />
-                    <Button x:Name="AddButton" Content="Add Zone" Style="{StaticResource PrimaryButtonStyle}" Padding="16,7" Margin="10,0,0,0" Click="Add_Click" />
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,28,0,0">
+                        <Button x:Name="CancelButton" Content="Cancel" Padding="16,7" Click="Cancel_Click" />
+                        <Button x:Name="AddButton" Content="Add Zone" Style="{StaticResource PrimaryButtonStyle}" Padding="16,7" Margin="10,0,0,0" Click="Add_Click" />
+                    </StackPanel>
                 </StackPanel>
             </StackPanel>
         </Border>

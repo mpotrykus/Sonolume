@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using System.Windows;
 using Microsoft.Win32;
 
@@ -54,7 +55,10 @@ public static class ProjectFileDialogs
 
     public static void SaveAs(Window owner, SonolumeSession session)
     {
-        var dialog = new SaveFileDialog { Filter = "Sonolume project (*.sonolume.json)|*.sonolume.json", FileName = "project.sonolume.json" };
+        string projectName = session.GetProjectCopy().Name;
+        string safeName = string.Concat(projectName.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+        if (string.IsNullOrWhiteSpace(safeName)) safeName = "project";
+        var dialog = new SaveFileDialog { Filter = "Sonolume project (*.sonolume.json)|*.sonolume.json", FileName = $"{safeName}.sonolume.json" };
         if (dialog.ShowDialog(owner) != true) return;
         try
         {

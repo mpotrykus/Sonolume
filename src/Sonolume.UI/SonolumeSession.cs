@@ -21,10 +21,6 @@ public sealed class SonolumeSession : IDisposable
     /// count as clean).</summary>
     private string savedSnapshot;
 
-    /// <summary>Project state as of the last <see cref="BeginLearn"/>, so <see cref="PollLearn"/> can fold the
-    /// mapping the engine thread adds directly (see <see cref="Engine.Engine.PushControl"/>) into undo history.</summary>
-    private string? learnBeforeSnapshot;
-
     public SonolumeSession(Project? project = null, HttpCanvasSinkOptions? sinkOptions = null)
     {
         InstanceId = Guid.NewGuid().ToString("N")[..8];
@@ -59,17 +55,6 @@ public sealed class SonolumeSession : IDisposable
     /// <summary>True while the project differs from what was last loaded/saved, so "Save" can disable itself
     /// when there is nothing to write (including after undoing back to that point).</summary>
     public bool HasUnsavedChanges { get; private set; }
-
-    /// <summary>The target/param/mode currently armed to learn the next matching MIDI event, if any.
-    /// UI-thread-only. Only one control can be listening at a time (the engine holds a single pending request).</summary>
-    public (TargetRef Target, ParamId Param, MappingMode Mode)? PendingLearn { get; private set; }
-
-    /// <summary>True while the engine is actually waiting on a controller move for <see cref="PendingLearn"/>
-    /// (lags <see cref="PendingLearn"/> slightly, since it comes from the polled engine snapshot).</summary>
-    public bool IsLearning => Runner.LatestSnapshot?.IsLearning ?? false;
-
-    public bool IsPendingLearn(TargetRef target, ParamId param, MappingMode mode) =>
-        PendingLearn is { } p && p.Target == target && p.Param == param && p.Mode == mode;
 
     public void Enqueue(in MidiEvent e) => Runner.Enqueue(e);
 
@@ -121,8 +106,8 @@ public sealed class SonolumeSession : IDisposable
     /// <summary>Adds the zone pre-wired with the default note-per-param convention (see <see cref="DefaultMacros"/>)
     /// so its continuous params are controllable from its auto-assigned octave immediately, no setup needed, and a
     /// Gate "Key" mapping on that same octave's root note ("C", see <see cref="DefaultMacros.KeySourceOf"/>) and
-    /// channel, so the zone lights up as soon as it's added instead of sitting silent until the user manually
-    /// learns a key.</summary>
+    /// channel, so the zone lights up as soon as it's added instead of sitting silent until the user picks a
+    /// different key octave.</summary>
     public void AddZone(Zone zone) => MutateWithUndo(e =>
     {
         e.AddZone(zone);
@@ -201,7 +186,8 @@ public sealed class SonolumeSession : IDisposable
 
     /// <summary>Adds the group pre-wired with the default note-per-param convention (see <see cref="DefaultMacros"/>),
     /// same as <see cref="AddZone"/>, plus a Gate "Key" mapping on that same octave's root note ("C") and channel,
-    /// so it lights up as soon as it's added instead of sitting silent until the user manually learns a key.</summary>
+    /// so it lights up as soon as it's added instead of sitting silent until the user picks a different key
+    /// octave.</summary>
     public void AddGroup(Group group) => MutateWithUndo(e =>
     {
         e.AddGroup(group);
@@ -214,20 +200,11 @@ public sealed class SonolumeSession : IDisposable
 
     public void RenameProject(string name) => MutateWithUndo(e => e.RenameProject(name));
 
-    /// <summary>Clears <paramref name="target"/>'s note-triggered "Key" mapping(s) - Trigger/Gate only, leaving its
-    /// fixed macro mappings (see <see cref="DefaultMacros"/>) untouched.</summary>
-    public void RemoveMappingsForTarget(TargetRef target) => MutateWithUndo(e =>
-    {
-        var ids = e.Project.Mappings.Where(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate)
-            .Select(m => m.Id).ToList();
-        foreach (var id in ids) e.RemoveMapping(id);
-    });
-
     /// <summary>Switches the effect used by <paramref name="target"/>'s Trigger/Gate mapping(s), if any exist
     /// (Set-mode macro mappings and the Select-mode effect-type macro mapping ignore this and are left alone), and upgrades
     /// them to Gate so the effect holds for as long as the key is down - covers mappings learned before Gate became
     /// the default, and the built-in default kit's Trigger mappings. No-op - and no undo entry - if nothing is
-    /// learned yet (the effect picker's selection is then just remembered for the next <see cref="BeginLearn"/>) or
+    /// learned yet (the effect picker's selection is then just remembered until a Key mapping exists) or
     /// if every matching mapping already has this EffectId and is already Gate, so the effect picker can call this
     /// unconditionally on every open without spamming undo history.</summary>
     public void SetEffect(TargetRef target, string effectId)
@@ -267,34 +244,24 @@ public sealed class SonolumeSession : IDisposable
         });
     }
 
-    /// <summary>Arms the engine to turn the next matching MIDI event into a mapping targeting
-    /// <paramref name="target"/>. Not undoable itself; <see cref="PollLearn"/> folds the result in once it lands.</summary>
-    public void BeginLearn(TargetRef target, ParamId param, MappingMode mode, string? effectId = null)
+    /// <summary>Sets the MIDI note <paramref name="target"/>'s Key mapping(s) must match to the root ("C") of
+    /// the given octave (<paramref name="note"/> is that C's note number, e.g. 60 for C4). Trigger/Gate only, same
+    /// filter as <see cref="SetKeyChannel"/>; no-op if there's no Key mapping yet or every match already has this
+    /// note.</summary>
+    public void SetKeyOctave(TargetRef target, int note)
     {
-        PendingLearn = (target, param, mode);
-        learnBeforeSnapshot = ExportProjectJson();
-        Runner.Post(e => e.BeginLearn(new LearnRequest(target, param, mode, effectId)));
-    }
+        var matching = GetProjectCopy().Mappings.Where(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate).ToList();
+        if (matching.Count == 0) return;
+        if (matching.All(m => m.Source.Number == note)) return;
 
-    public void CancelLearn()
-    {
-        Runner.Post(e => e.CancelLearn());
-        PendingLearn = null;
-        learnBeforeSnapshot = null;
-    }
-
-    /// <summary>Call periodically (the editor already polls at a fixed interval). Once a pending learn resolves -
-    /// the engine thread adds the mapping directly, outside <see cref="MutateWithUndo"/> - folds it into undo
-    /// history and unsaved-changes tracking like any other structural edit.</summary>
-    public void PollLearn()
-    {
-        if (PendingLearn is null || IsLearning) return;
-        string before = learnBeforeSnapshot!;
-        learnBeforeSnapshot = null;
-        PendingLearn = null;
-        PushCapped(undoStack, before);
-        redoStack.Clear();
-        HasUnsavedChanges = ExportProjectJson() != savedSnapshot;
+        MutateWithUndo(e =>
+        {
+            foreach (var m in e.Project.Mappings)
+            {
+                if (m.Target != target || m.Mode is not (MappingMode.Trigger or MappingMode.Gate)) continue;
+                m.Source = m.Source with { Number = note };
+            }
+        });
     }
 
     public void Undo()

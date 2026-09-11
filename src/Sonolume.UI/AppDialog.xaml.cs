@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
 
 namespace Sonolume.UI;
 
@@ -21,6 +22,7 @@ public partial class AppDialog : Window
     {
         var dialog = Build(owner, message, title);
         dialog.ConfirmButton.Content = "OK";
+        dialog.TitleIcon.Text = "";
         dialog.ShowDialog();
     }
 
@@ -32,7 +34,16 @@ public partial class AppDialog : Window
         dialog.ConfirmButton.Content = confirmText;
         dialog.CancelButton.Content = cancelText;
         dialog.CancelButton.Visibility = Visibility.Visible;
-        if (destructive) dialog.ConfirmButton.Style = (Style)dialog.FindResource("DangerButtonStyle");
+        if (destructive)
+        {
+            dialog.ConfirmButton.Style = (Style)dialog.FindResource("DangerButtonStyle");
+            dialog.TitleIcon.Text = "";
+            dialog.TitleIcon.Foreground = (Brush)dialog.FindResource("DangerBrush");
+        }
+        else
+        {
+            dialog.TitleIcon.Text = "";
+        }
         dialog.ShowDialog();
         return dialog.confirmed;
     }
