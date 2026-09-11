@@ -1152,16 +1152,18 @@ public partial class SonolumeView : UserControl
         });
         var posXRow = BuildSliderRow(ParamId.PosX, values, target, onChange);
         var posYRow = BuildSliderRow(ParamId.PosY, values, target, onChange);
+        var rotationRow = BuildSliderRow(ParamId.EffectRotation, values, target, onChange);
         var effectRow = BuildEffectRow(target, id =>
         {
             colorGroup.Visibility = id == RainbowEffect.TypeName ? Visibility.Collapsed : Visibility.Visible;
             var posVisibility = id is RippleEffect.TypeName or WaveEffect.TypeName ? Visibility.Visible : Visibility.Collapsed;
             posXRow.Visibility = posVisibility;
             posYRow.Visibility = posVisibility;
+            rotationRow.Visibility = id == WaveEffect.TypeName ? Visibility.Visible : Visibility.Collapsed;
         });
 
-        var posYRowElement = (FrameworkElement)posYRow;
-        posYRowElement.Margin = new Thickness(posYRowElement.Margin.Left, posYRowElement.Margin.Top, posYRowElement.Margin.Right, 0);
+        var rotationRowElement = (FrameworkElement)rotationRow;
+        rotationRowElement.Margin = new Thickness(rotationRowElement.Margin.Left, rotationRowElement.Margin.Top, rotationRowElement.Margin.Right, 0);
 
         var modulationRows = new StackPanel();
         modulationRows.Children.Add(BuildSliderRow(ParamId.EffectIntensity, values, target, onChange));
@@ -1169,6 +1171,7 @@ public partial class SonolumeView : UserControl
         modulationRows.Children.Add(BuildSliderRow(ParamId.EffectDecay, values, target, onChange));
         modulationRows.Children.Add(posXRow);
         modulationRows.Children.Add(posYRow);
+        modulationRows.Children.Add(rotationRow);
 
         var modulationGroup = new Border
         {
@@ -1301,6 +1304,7 @@ public partial class SonolumeView : UserControl
         ParamId.PaletteIndex => "Palette",
         ParamId.PosX => "X",
         ParamId.PosY => "Y",
+        ParamId.EffectRotation => "Rotation",
         _ => id.ToString(),
     };
 
@@ -1340,14 +1344,6 @@ public partial class SonolumeView : UserControl
         DockPanel.SetDock(label, Dock.Left);
         headerRow.Children.Add(label);
 
-        if (id is not ParamId.PaletteIndex) // no effect reads this yet - not worth mapping either
-        {
-            var proj = projectSnapshot ?? session.GetProjectCopy();
-            var macroLabel = BuildMacroLabel(DefaultMacros.ParamSourceOf(proj, target, id));
-            DockPanel.SetDock(macroLabel, Dock.Right);
-            headerRow.Children.Add(macroLabel);
-        }
-
         var slider = new Slider
         {
             Minimum = info.Min,
@@ -1360,6 +1356,43 @@ public partial class SonolumeView : UserControl
         {
             slider.IsSnapToTickEnabled = true;
             slider.TickFrequency = 0.01f;
+        }
+        else if (id == ParamId.EffectRotation)
+        {
+            slider.IsSnapToTickEnabled = true;
+            slider.TickFrequency = 1f;
+        }
+
+        Button? resetButton = null;
+        if (id is not ParamId.PaletteIndex) // no effect reads this yet - not worth mapping either
+        {
+            resetButton = new Button
+            {
+                Content = new TextBlock
+                {
+                    Text = "",
+                    FontFamily = (FontFamily)FindResource("IconFontFamily"),
+                    FontSize = 11,
+                    Foreground = MutedBrush,
+                },
+                Style = (Style)FindResource("PlainIconButtonStyle"),
+                Padding = new Thickness(4, 2, 4, 2),
+                ToolTip = "Reset to default",
+                IsEnabled = !Approximately(values[id], info.Default),
+            };
+            resetButton.Click += (_, _) =>
+            {
+                string before = session.ExportProjectJson();
+                slider.Value = info.Default;
+                session.CommitLiveEdit(before);
+            };
+            DockPanel.SetDock(resetButton, Dock.Right);
+            headerRow.Children.Add(resetButton);
+
+            var proj = projectSnapshot ?? session.GetProjectCopy();
+            var macroLabel = BuildMacroLabel(DefaultMacros.ParamSourceOf(proj, target, id));
+            DockPanel.SetDock(macroLabel, Dock.Right);
+            headerRow.Children.Add(macroLabel);
         }
 
         var hoverText = new TextBlock { Foreground = MutedBrush, Text = FmtSlider(id, info, values[id]) };
@@ -1393,17 +1426,30 @@ public partial class SonolumeView : UserControl
 
         // The Slider template's Thumb still raises Drag* even though Track consumes DragDelta itself, so this is
         // the only reliable "is the user actively dragging" signal - IsMouseCaptureWithin also fires on a plain click.
+        string? dragBeforeSnapshot = null;
         slider.AddHandler(Thumb.DragStartedEvent, new DragStartedEventHandler((_, _) =>
         {
+            dragBeforeSnapshot = session.ExportProjectJson();
             hoverPopup.IsOpen = true;
             UpdateHoverPosition();
         }), true);
-        slider.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, _) => hoverPopup.IsOpen = false), true);
+        slider.AddHandler(Thumb.DragCompletedEvent, new DragCompletedEventHandler((_, _) =>
+        {
+            hoverPopup.IsOpen = false;
+            if (dragBeforeSnapshot is not null) session.CommitLiveEdit(dragBeforeSnapshot);
+            dragBeforeSnapshot = null;
+        }), true);
 
         slider.ValueChanged += (_, e) =>
         {
-            float value = id == ParamId.EffectDecay ? SnapToStep((float)e.NewValue, 0.01f) : (float)e.NewValue;
+            float value = id switch
+            {
+                ParamId.EffectDecay => SnapToStep((float)e.NewValue, 0.01f),
+                ParamId.EffectRotation => SnapToStep((float)e.NewValue, 1f),
+                _ => (float)e.NewValue,
+            };
             hoverText.Text = FmtSlider(id, info, value);
+            if (resetButton is not null) resetButton.IsEnabled = !Approximately(value, info.Default);
             if (hoverPopup.IsOpen) UpdateHoverPosition();
             if (suppressParamsRefresh) return; // this move came from RefreshOpenPanel echoing a live value, not the user
             onChange(id, value);

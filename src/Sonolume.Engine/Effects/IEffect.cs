@@ -11,6 +11,8 @@ namespace Sonolume.Engine.Effects;
 public readonly record struct TriggerInfo(float Intensity01, int Note, float Velocity01, long TimestampTicks, bool Sustain = false);
 
 /// <summary>Zone parameters after group composition. Computed once per zone per tick.</summary>
+/// <param name="Rotation">0..360 degrees, direction an effect's motion travels across the zone's grid (0 = left-
+/// to-right). Only effects with a directional sweep (e.g. <see cref="WaveEffect"/>) read this.</param>
 /// <param name="BeatsPerSecond">Host tempo (BPM/60), or 0 when nothing is driving tempo (standalone: always
 /// free-running; see <see cref="TempoSynced"/>).</param>
 /// <param name="SongBeats">Elapsed beats since the host started transport, frozen while stopped. Only meaningful
@@ -29,6 +31,7 @@ public readonly record struct ResolvedParams(
     float PosX,
     float PosY,
     float PaletteIndex,
+    float Rotation = 0f,
     float BeatsPerSecond = 0f,
     double SongBeats = 0.0,
     bool TempoSynced = false)

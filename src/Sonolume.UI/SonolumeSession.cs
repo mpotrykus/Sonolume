@@ -96,11 +96,26 @@ public sealed class SonolumeSession : IDisposable
         HasUnsavedChanges = false;
     }
 
-    /// <summary>Live parameter tweak (brightness, hue, ...). Not undoable.</summary>
+    /// <summary>Live parameter tweak (brightness, hue, ...), applied on every tick of a drag. Not undoable by
+    /// itself - call <see cref="CommitLiveEdit"/> once the drag/interaction finishes to record one undo entry
+    /// for the whole gesture.</summary>
     public void SetParam(TargetRef target, ParamId id, float raw)
     {
         Runner.Post(e => e.SetParam(target, id, raw));
         HasUnsavedChanges = true;
+    }
+
+    /// <summary>Records one undo entry for a live-tweak gesture (slider drag, reset-to-default) that mutated the
+    /// engine tick-by-tick via <see cref="SetParam"/> without going through <see cref="MutateWithUndo"/>. Call once
+    /// when the gesture finishes, passing the snapshot captured (via <see cref="ExportProjectJson"/>) just before
+    /// it started. No-op if the gesture didn't actually change anything (e.g. reset when already at default).</summary>
+    public void CommitLiveEdit(string before)
+    {
+        string after = ExportProjectJson();
+        if (after == before) return;
+        PushCapped(undoStack, before);
+        redoStack.Clear();
+        HasUnsavedChanges = after != savedSnapshot;
     }
 
     /// <summary>Adds the zone pre-wired with the default note-per-param convention (see <see cref="DefaultMacros"/>)

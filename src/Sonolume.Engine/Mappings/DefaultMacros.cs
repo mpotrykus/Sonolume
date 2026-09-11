@@ -35,7 +35,8 @@ public static class DefaultMacros
     private const int ParamsStartOffset = 3;
 
     /// <summary>The continuous Set-mode params, in the same top-to-bottom order as the color/modulation/position
-    /// rows below the Type and Blend rows.</summary>
+    /// rows below the Type and Blend rows. EffectRotation is appended rather than inserted near PosX/PosY so every
+    /// param note offset already handed out for an existing project stays put (see <see cref="AllocateOctave"/>).</summary>
     private static readonly ParamId[] Params =
     {
         ParamId.Hue,
@@ -46,6 +47,7 @@ public static class DefaultMacros
         ParamId.EffectDecay,
         ParamId.PosX,
         ParamId.PosY,
+        ParamId.EffectRotation,
     };
 
     /// <summary>The note (and channel) that already drives <paramref name="target"/>'s Set-mode mapping for

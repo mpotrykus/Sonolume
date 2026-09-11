@@ -6,8 +6,8 @@ namespace Sonolume.Engine.Tests;
 
 public class WaveEffectTests
 {
-    private static ResolvedParams Params(float decay = 5f) =>
-        new(1f, 0f, 1f, true, 1f, 0.5f, decay, 0.5f, 0.5f, 0f);
+    private static ResolvedParams Params(float decay = 5f, float rotation = 0f) =>
+        new(1f, 0f, 1f, true, 1f, 0.5f, decay, 0.5f, 0.5f, 0f, rotation);
 
     private static int Brightest(Span<Rgb8> cells)
     {
@@ -61,6 +61,28 @@ public class WaveEffectTests
         Span<Rgb8> cellsLate = stackalloc Rgb8[9];
         wave.Render(cellsLate, 9, 1, Params());
         Assert.All(cellsLate.ToArray(), c => Assert.Equal(0, c.R));
+    }
+
+    [Fact]
+    public void Rotation_TurnsTravelFromHorizontalToVertical()
+    {
+        // At rotation 0 the band should vary across columns but be uniform down any column.
+        var horizontal = new WaveEffect();
+        horizontal.Trigger(new TriggerInfo(1f, 36, 1f, 0), Params());
+        horizontal.Update(0.05f, Params());
+        Span<Rgb8> hCells = stackalloc Rgb8[9];
+        horizontal.Render(hCells, 3, 3, Params());
+        Assert.Equal(hCells[0].R, hCells[3].R);
+        Assert.Equal(hCells[0].R, hCells[6].R);
+
+        // At rotation 90 degrees (quarter turn) the band should instead vary down rows but be uniform across any row.
+        var vertical = new WaveEffect();
+        vertical.Trigger(new TriggerInfo(1f, 36, 1f, 0), Params(rotation: 90f));
+        vertical.Update(0.05f, Params(rotation: 90f));
+        Span<Rgb8> vCells = stackalloc Rgb8[9];
+        vertical.Render(vCells, 3, 3, Params(rotation: 90f));
+        Assert.Equal(vCells[0].R, vCells[1].R);
+        Assert.Equal(vCells[0].R, vCells[2].R);
     }
 
     [Fact]

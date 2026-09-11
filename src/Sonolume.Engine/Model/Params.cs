@@ -11,6 +11,7 @@ public enum ParamId
     EffectDecay,
     PosX,
     PosY,
+    EffectRotation,
     PaletteIndex,
     /// <summary>Not a real param - only used to tag a Select-mode mapping as blend-select (see
     /// <see cref="Mappings.MappingMode.Select"/> and <see cref="Engine.Engine.SelectBlend"/>), the same way
@@ -60,6 +61,7 @@ public static class ParamInfos
                 ParamId.EffectDecay => new(id, 0.01f, 5f, 0.25f, "s"),
                 ParamId.PosX => new(id, 0f, 1f, 0.5f, ""),
                 ParamId.PosY => new(id, 0f, 1f, 0.5f, ""),
+                ParamId.EffectRotation => new(id, 0f, 360f, 0f, "°"),
                 ParamId.PaletteIndex => new(id, 0f, 1f, 0f, ""),
                 ParamId.Blend => new(id, 0f, 1f, 0f, ""),
                 _ => throw new InvalidOperationException($"No ParamInfo for {id}"),

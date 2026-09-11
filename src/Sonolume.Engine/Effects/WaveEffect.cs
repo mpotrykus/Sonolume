@@ -2,12 +2,13 @@ using Sonolume.Engine.Core;
 
 namespace Sonolume.Engine.Effects;
 
-/// <summary>A single bright band that travels once across the zone's cells (left to right) and finishes, under a
-/// Flash-style decay envelope - the same one-shot shape as <see cref="RippleEffect"/>, just linear instead of
-/// radial: one key press sends out one wave that runs its path rather than looping. EffectSpeed is a propagation
-/// speed (strip-widths/second), not a tempo-locked rate, since the band's position is tied to real elapsed time
-/// since it was triggered, not a beat grid. A Gate mapping holds the level at peak (the band keeps traveling) for
-/// as long as the key is down; decay only runs after release.</summary>
+/// <summary>A single bright band that travels once across the zone's cells (left to right by default) and
+/// finishes, under a Flash-style decay envelope - the same one-shot shape as <see cref="RippleEffect"/>, just
+/// linear instead of radial: one key press sends out one wave that runs its path rather than looping. EffectSpeed
+/// is a propagation speed (strip-widths/second), not a tempo-locked rate, since the band's position is tied to
+/// real elapsed time since it was triggered, not a beat grid. Rotation turns the travel direction around the
+/// zone's center (0 = left-to-right, 90 = top-to-bottom). A Gate mapping holds the level at peak (the band keeps
+/// traveling) for as long as the key is down; decay only runs after release.</summary>
 public sealed class WaveEffect : IEffect
 {
     public const string TypeName = "wave";
@@ -42,12 +43,17 @@ public sealed class WaveEffect : IEffect
     {
         float speed = MathF.Max(0.2f, p.EffectSpeed * 3f);
         float pos = age * speed;
+        float angle = p.Rotation * (MathF.PI / 180f);
+        float dirX = MathF.Cos(angle);
+        float dirY = MathF.Sin(angle);
 
         for (int cy = 0; cy < cellsH; cy++)
         {
             for (int cx = 0; cx < cellsW; cx++)
             {
-                float cellPos = cellsW <= 1 ? 0f : (float)cx / (cellsW - 1);
+                float nx = cellsW <= 1 ? 0f : (float)cx / (cellsW - 1);
+                float ny = cellsH <= 1 ? 0f : (float)cy / (cellsH - 1);
+                float cellPos = 0.5f + (nx - 0.5f) * dirX + (ny - 0.5f) * dirY;
                 float band = MathF.Max(0f, 1f - MathF.Abs(cellPos - pos) / BandWidth);
                 cells[cy * cellsW + cx] = p.ZoneColor.Scale(level * band);
             }

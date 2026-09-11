@@ -80,6 +80,7 @@ internal sealed class ZoneRuntime
             p[ParamId.PosX],
             p[ParamId.PosY],
             p[ParamId.PaletteIndex],
+            p[ParamId.EffectRotation],
             beatsPerSecond,
             songBeats,
             tempoSynced);
