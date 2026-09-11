@@ -97,6 +97,29 @@ public sealed class SignalRgbMcpClient(string endpoint = "http://127.0.0.1:16037
         return new SignalRgbImportResult(layouts, skipped, canvasWidth, canvasHeight);
     }
 
+    /// <summary>Cheap standalone read of just the shared canvas size, for prefilling the manual-entry dialog
+    /// without a full device scan: one <c>read_devices</c> call plus a single <c>device_position</c> call against
+    /// whichever device it lists first (canvas size comes bundled with every device's position and is shared
+    /// across all of them). Returns null if SignalRGB reports no devices at all.</summary>
+    /// <exception cref="HttpRequestException">SignalRGB isn't running, or its MCP server is disabled.</exception>
+    public async Task<(float Width, float Height)?> TryGetCanvasSizeAsync(CancellationToken ct = default)
+    {
+        var deviceLines = (await CallToolAsync("read_devices", null, ct)).Split('\n');
+        foreach (var line in deviceLines)
+        {
+            var dm = DeviceLineRegex.Match(line);
+            if (!dm.Success) continue;
+
+            string posText = await CallToolAsync("device_position", new Dictionary<string, object> { ["name"] = dm.Groups["uid"].Value }, ct);
+            var pm = PositionRegex.Match(posText);
+            if (!pm.Success) continue;
+
+            float cw = ParseFloat(pm, "cw"), ch = ParseFloat(pm, "ch");
+            if (cw > 0 && ch > 0) return (cw, ch);
+        }
+        return null;
+    }
+
     /// <summary>Total populated-component count per controller name, summed across its channels (e.g. a fan hub
     /// with 4 occupied channels sums to 4). Devices with no channels at all (a plain keyboard, RAM, ...) simply
     /// don't appear here - callers should treat an absent name as an unambiguous single device, not as zero.</summary>

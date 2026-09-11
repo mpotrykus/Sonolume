@@ -34,10 +34,14 @@ public partial class SonolumeView : UserControl
 
     private Project? projectSnapshot;
 
-    /// <summary>Canvas size from the last successful <see cref="ImportSignalRgb_Click"/>, used only to prefill
-    /// <see cref="ManualSignalRgbImport_Click"/>'s canvas fields (it rarely changes between devices). Null until
-    /// the first automatic import succeeds; the manual dialog works fine without it, just unprefilled.</summary>
+    /// <summary>Last canvas size seen from SignalRGB, from either an automatic import or a live probe by
+    /// <see cref="ManualSignalRgbImport_Click"/>. Used as its fallback prefill when SignalRGB can't be reached
+    /// live (it rarely changes between devices). Null until the first successful read.</summary>
     private (float Width, float Height)? lastSignalRgbCanvasSize;
+
+    /// <summary>Last-resort prefill for the manual-import canvas fields when SignalRGB has never been reached
+    /// this session - an arbitrary but plausible starting point, not a real SignalRGB default.</summary>
+    private static readonly (float Width, float Height) DefaultSignalRgbCanvasSize = (320, 200);
 
     private SelectionKind currentKind = SelectionKind.None;
     private string? currentId;
@@ -1029,10 +1033,31 @@ public partial class SonolumeView : UserControl
 
     /// <summary>Opens <see cref="ManualSignalRgbImportDialog"/> and adds the entered zone the same way
     /// <see cref="AddZone_Click"/> does - for a device/component the automatic import skipped (see its
-    /// "Skipped" list) because SignalRGB can't report an individual position for it.</summary>
-    private void ManualSignalRgbImport_Click(object sender, RoutedEventArgs e)
+    /// "Skipped" list) because SignalRGB can't report an individual position for it. Prefills the canvas fields
+    /// with a fresh read from SignalRGB where possible, falling back to the last known size and then to
+    /// <see cref="DefaultSignalRgbCanvasSize"/> if SignalRGB can't be reached at all.</summary>
+    private async void ManualSignalRgbImport_Click(object sender, RoutedEventArgs e)
     {
-        var entered = ManualSignalRgbImportDialog.Show(OwnerWindow, lastSignalRgbCanvasSize?.Width, lastSignalRgbCanvasSize?.Height);
+        ManualSignalRgbImportMenuItem.IsEnabled = false;
+        (float Width, float Height) canvasSize;
+        try
+        {
+            using var client = new SignalRgbMcpClient();
+            canvasSize = await client.TryGetCanvasSizeAsync() is { } live
+                ? live
+                : lastSignalRgbCanvasSize ?? DefaultSignalRgbCanvasSize;
+        }
+        catch (Exception)
+        {
+            canvasSize = lastSignalRgbCanvasSize ?? DefaultSignalRgbCanvasSize;
+        }
+        finally
+        {
+            ManualSignalRgbImportMenuItem.IsEnabled = true;
+        }
+        lastSignalRgbCanvasSize = canvasSize;
+
+        var entered = ManualSignalRgbImportDialog.Show(OwnerWindow, canvasSize.Width, canvasSize.Height);
         if (entered is null) return;
 
         var project = projectSnapshot ?? session.GetProjectCopy();
