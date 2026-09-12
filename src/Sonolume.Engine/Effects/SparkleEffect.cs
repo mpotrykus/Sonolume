@@ -3,7 +3,8 @@ using Sonolume.Engine.Core;
 namespace Sonolume.Engine.Effects;
 
 /// <summary>Random cells twinkle and fade independently while the overall zone decays under a Flash-style
-/// envelope. EffectSpeed sets how often new sparkles spawn. A Gate mapping keeps sparkling at full level for as
+/// envelope. EffectSpeed picks the note value (<see cref="NoteDuration"/>) that sets each cell's average time
+/// between sparkles, tempo-locked when the host reports one. A Gate mapping keeps sparkling at full level for as
 /// long as the key is down; decay only runs after release.</summary>
 public sealed class SparkleEffect : IEffect
 {
@@ -34,7 +35,7 @@ public sealed class SparkleEffect : IEffect
         int count = cellsW * cellsH;
         if (cellLevels.Length != count) cellLevels = new float[count];
 
-        float spawnChance = 0.05f + p.EffectSpeed * 0.35f;
+        float spawnChance = Math.Clamp(1f / (60f * NoteDuration.Seconds(p)), 0.02f, 0.6f);
         float fade = MathF.Exp(-SparkleFadeRate / 60f); // ~1 tick's worth of fade at the engine's nominal rate
 
         for (int i = 0; i < count; i++)

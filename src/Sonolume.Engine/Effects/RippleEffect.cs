@@ -3,10 +3,10 @@ using Sonolume.Engine.Core;
 namespace Sonolume.Engine.Effects;
 
 /// <summary>A ring that expands outward from (PosX, PosY) across the zone's grid, fading as it decays. EffectSpeed
-/// is a propagation speed (grid-widths/second), not a tempo-locked rate - a ring's radius is tied to real elapsed
-/// time since it was triggered, not to a beat grid, so it isn't quantized to musical subdivisions. A Gate mapping
-/// holds the level at peak (the ring keeps expanding) for as long as the key is down; decay only runs after
-/// release. Retriggering while one is still active layers a new, independent ring instead of resetting it.</summary>
+/// picks the note value (<see cref="NoteDuration"/>) the ring takes to reach the grid's edge, tempo-locked when the
+/// host reports one. A Gate mapping holds the level at peak (the ring keeps expanding) for as long as the key is
+/// down; decay only runs after release. Retriggering while one is still active layers a new, independent ring
+/// instead of resetting it.</summary>
 public sealed class RippleEffect : IEffect
 {
     public const string TypeName = "ripple";
@@ -45,8 +45,7 @@ public sealed class RippleEffect : IEffect
 
     public void Render(Span<Rgb8> cells, int cellsW, int cellsH, in ResolvedParams p)
     {
-        float speed = MathF.Max(0.2f, p.EffectSpeed * 3f);
-        float radius = age * speed;
+        float radius = age / NoteDuration.Seconds(p);
 
         for (int cy = 0; cy < cellsH; cy++)
         {

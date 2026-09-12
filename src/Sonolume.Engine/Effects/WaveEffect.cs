@@ -5,8 +5,9 @@ namespace Sonolume.Engine.Effects;
 /// <summary>A single bright band that travels once across the zone's cells (left to right by default) and
 /// finishes, under a Flash-style decay envelope - the same one-shot shape as <see cref="RippleEffect"/>, just
 /// linear instead of radial: one key press sends out one wave that runs its path rather than looping. EffectSpeed
-/// is a propagation speed (strip-widths/second), not a tempo-locked rate, since the band's position is tied to
-/// real elapsed time since it was triggered, not a beat grid. Rotation turns the travel direction around the
+/// picks the note value (<see cref="NoteDuration"/>) the band takes to cross the full zone width, tempo-locked
+/// when the host reports one - so a long note can be matched to a wave that takes just as long, chosen up front
+/// rather than known in advance (MIDI has no note-off lookahead). Rotation turns the travel direction around the
 /// zone's center (0 = left-to-right, 90 = top-to-bottom). A Gate mapping holds the level at peak (the band keeps
 /// traveling) for as long as the key is down; decay only runs after release.</summary>
 public sealed class WaveEffect : IEffect
@@ -41,8 +42,7 @@ public sealed class WaveEffect : IEffect
 
     public void Render(Span<Rgb8> cells, int cellsW, int cellsH, in ResolvedParams p)
     {
-        float speed = MathF.Max(0.2f, p.EffectSpeed * 3f);
-        float pos = age * speed;
+        float pos = age / NoteDuration.Seconds(p);
         float angle = p.Rotation * (MathF.PI / 180f);
         float dirX = MathF.Cos(angle);
         float dirY = MathF.Sin(angle);

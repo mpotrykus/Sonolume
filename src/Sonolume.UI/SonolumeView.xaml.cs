@@ -3,6 +3,7 @@ using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
+using System.Windows.Data;
 using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -61,6 +62,9 @@ public partial class SonolumeView : UserControl
     /// rebuilding the whole panel - which would drop an in-progress drag. Rebuilt whenever <see cref="RebuildParamsPanel"/>
     /// runs (selection change); cleared on <see cref="ClearSelection"/>.</summary>
     private readonly Dictionary<ParamId, (Slider Slider, TextBlock ValueText)> paramSliders = new();
+    /// <summary>Same purpose as <see cref="paramSliders"/>, for the params rendered as a note-duration dropdown
+    /// (EffectSpeed) instead of a slider.</summary>
+    private readonly Dictionary<ParamId, ComboBox> paramCombos = new();
     private ColorPickerControl? liveColorPicker;
 
     /// <summary>Effect chosen in the picker for the current selection before anything is learned; once a
@@ -87,20 +91,38 @@ public partial class SonolumeView : UserControl
     private bool suppressChannelCombo;
     private bool suppressKeyOctaveCombo;
 
-    private sealed record EffectOption(string Id, string Label);
+    private sealed record EffectOption(string Id, string Label, string Range);
 
-    private static readonly EffectOption[] EffectOptions =
-    [
-        new(SolidEffect.TypeName, "Solid"),
-        new(FlashEffect.TypeName, "Flash"),
-        new(WaveEffect.TypeName, "Wave"),
-        new(PulseEffect.TypeName, "Pulse"),
-        new(StrobeEffect.TypeName, "Strobe"),
-        new(ChaseEffect.TypeName, "Chase"),
-        new(RippleEffect.TypeName, "Ripple"),
-        new(SparkleEffect.TypeName, "Sparkle"),
-        new(RainbowEffect.TypeName, "Rainbow"),
-    ];
+    // Order here must match EffectRegistry's registration order - Engine.SelectEffect picks by dividing 0..1 into
+    // one equal slice per effect in that same order, and Range below assumes it lines up with this array's index.
+    private static readonly EffectOption[] EffectOptions = BuildEffectOptions();
+
+    private static EffectOption[] BuildEffectOptions()
+    {
+        (string Id, string Label)[] raw =
+        [
+            (SolidEffect.TypeName, "Solid"),
+            (FlashEffect.TypeName, "Flash"),
+            (WaveEffect.TypeName, "Wave"),
+            (PulseEffect.TypeName, "Pulse"),
+            (StrobeEffect.TypeName, "Strobe"),
+            (ChaseEffect.TypeName, "Chase"),
+            (RippleEffect.TypeName, "Ripple"),
+            (SparkleEffect.TypeName, "Sparkle"),
+            (RainbowEffect.TypeName, "Rainbow"),
+        ];
+        return raw.Select((o, i) => new EffectOption(o.Id, o.Label, EqualSliceRangeText(i, raw.Length))).ToArray();
+    }
+
+    private sealed record NoteDurationOption(string Label, string Range);
+
+    private sealed record BlendOption(BlendMode Mode, string Label, string Range);
+
+    // Order here must match Engine.SelectBlend's BlendModes array (Enum.GetValues<BlendMode> declaration order) -
+    // it picks by dividing 0..1 into one equal slice per mode in that same order, same as EffectOptions/SelectEffect.
+    private static readonly BlendOption[] BlendOptions = Enum.GetValues<BlendMode>()
+        .Select((mode, i) => new BlendOption(mode, mode.ToString(), EqualSliceRangeText(i, Enum.GetValues<BlendMode>().Length)))
+        .ToArray();
 
     private sealed record ChannelOption(int Value, string Label);
 
@@ -202,11 +224,6 @@ public partial class SonolumeView : UserControl
         }
 
         UpdateSinkStatus(session.Sink.Status);
-
-        MidiText.Inlines.Clear();
-        MidiText.Inlines.Add(new Run($"MIDI: {session.Runner.ProcessedEvents} events"));
-        if (session.Runner.DroppedEvents > 0)
-            MidiText.Inlines.Add(new Run($", {session.Runner.DroppedEvents} dropped") { Foreground = (Brush)FindResource("DangerBrush") });
     }
 
     private void UpdateSinkStatus(SinkStatus status)
@@ -220,9 +237,6 @@ public partial class SonolumeView : UserControl
             _ => "SignalRGB: connecting...",
         };
         StatusMsText.Text = $"{status.LastSendMs:0.0} ms";
-        StatusFramesText.Text = $"{status.FramesSent} frames";
-        StatusDroppedText.Text = status.FramesDropped > 0 ? $"({status.FramesDropped} dropped)" : "";
-        StatusDroppedText.Foreground = status.FramesDropped > 0 ? (Brush)FindResource("DangerBrush") : (Brush)FindResource("MutedForegroundBrush");
     }
 
     private Brush LatencyBrush(double lastSendMs) => lastSendMs switch
@@ -374,10 +388,10 @@ public partial class SonolumeView : UserControl
     {
         if (liveBlendCombo is null || liveBlendTarget != target) return;
         if (liveBlendCombo.IsDropDownOpen) return;
-        if (Equals(liveBlendCombo.SelectedItem, currentBlend)) return;
+        if (liveBlendCombo.SelectedItem is BlendOption { Mode: var selected } && selected == currentBlend) return;
 
         suppressBlendCombo = true;
-        liveBlendCombo.SelectedItem = currentBlend;
+        liveBlendCombo.SelectedItem = Array.Find(BlendOptions, o => o.Mode == currentBlend);
         suppressBlendCombo = false;
     }
 
@@ -397,6 +411,12 @@ public partial class SonolumeView : UserControl
             if (Approximately((float)slider.Value, raw)) continue;
             slider.Value = raw;
             valueText.Text = FmtSlider(id, ParamInfos.Of(id), raw);
+        }
+        foreach (var (id, combo) in paramCombos)
+        {
+            if (combo.IsDropDownOpen) continue;
+            int index = NoteDuration.IndexOf(values[id]);
+            if (combo.SelectedIndex != index) combo.SelectedIndex = index;
         }
         if (liveColorPicker is { IsMouseCaptured: false } picker)
         {
@@ -478,6 +498,7 @@ public partial class SonolumeView : UserControl
         ParamsActiveCheckBox.Unchecked -= ParamsActiveCheckBox_Changed;
         paramsActiveOnChange = null;
         paramSliders.Clear();
+        paramCombos.Clear();
         liveColorPicker = null;
         liveEffectCombo = null;
         liveEffectTarget = null;
@@ -1129,6 +1150,7 @@ public partial class SonolumeView : UserControl
     {
         panel.Children.Clear();
         paramSliders.Clear();
+        paramCombos.Clear();
         liveColorPicker = null;
         liveEffectCombo = null;
         liveEffectOnChanged = null;
@@ -1153,13 +1175,17 @@ public partial class SonolumeView : UserControl
         var posXRow = BuildSliderRow(ParamId.PosX, values, target, onChange);
         var posYRow = BuildSliderRow(ParamId.PosY, values, target, onChange);
         var rotationRow = BuildSliderRow(ParamId.EffectRotation, values, target, onChange);
+        var speedRow = BuildSliderRow(ParamId.EffectSpeed, values, target, onChange);
+        var decayRow = BuildSliderRow(ParamId.EffectDecay, values, target, onChange);
         var effectRow = BuildEffectRow(target, id =>
         {
             colorGroup.Visibility = id == RainbowEffect.TypeName ? Visibility.Collapsed : Visibility.Visible;
-            var posVisibility = id is RippleEffect.TypeName or WaveEffect.TypeName ? Visibility.Visible : Visibility.Collapsed;
+            var posVisibility = id == RippleEffect.TypeName ? Visibility.Visible : Visibility.Collapsed;
             posXRow.Visibility = posVisibility;
             posYRow.Visibility = posVisibility;
             rotationRow.Visibility = id == WaveEffect.TypeName ? Visibility.Visible : Visibility.Collapsed;
+            speedRow.Visibility = id is SolidEffect.TypeName or FlashEffect.TypeName ? Visibility.Collapsed : Visibility.Visible;
+            decayRow.Visibility = id is SolidEffect.TypeName or RainbowEffect.TypeName ? Visibility.Collapsed : Visibility.Visible;
         });
 
         var rotationRowElement = (FrameworkElement)rotationRow;
@@ -1167,8 +1193,8 @@ public partial class SonolumeView : UserControl
 
         var modulationRows = new StackPanel();
         modulationRows.Children.Add(BuildSliderRow(ParamId.EffectIntensity, values, target, onChange));
-        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectSpeed, values, target, onChange));
-        modulationRows.Children.Add(BuildSliderRow(ParamId.EffectDecay, values, target, onChange));
+        modulationRows.Children.Add(speedRow);
+        modulationRows.Children.Add(decayRow);
         modulationRows.Children.Add(posXRow);
         modulationRows.Children.Add(posYRow);
         modulationRows.Children.Add(rotationRow);
@@ -1204,7 +1230,7 @@ public partial class SonolumeView : UserControl
         var proj = projectSnapshot ?? session.GetProjectCopy();
         var macroLabel = BuildMacroLabel(DefaultMacros.EffectTypeSourceOf(proj, target));
 
-        var combo = new ComboBox { DisplayMemberPath = "Label", ItemsSource = EffectOptions };
+        var combo = new ComboBox { ItemsSource = EffectOptions, ItemTemplateSelector = OptionSelector };
 
         string effectId = proj.Mappings
             .FirstOrDefault(m => m.Target == target && m.Mode is MappingMode.Trigger or MappingMode.Gate)?.EffectId ?? pendingEffectId;
@@ -1320,8 +1346,94 @@ public partial class SonolumeView : UserControl
         _ => null,
     };
 
+    /// <summary>EffectSpeed is a discrete note-duration selection (<see cref="NoteDuration"/>), not a continuous
+    /// value, so it gets a dropdown of labeled steps instead of the slider every other param uses.</summary>
+    private UIElement BuildNoteDurationRow(ParamId id, ParamSet values, TargetRef target, Action<ParamId, float> onChange)
+    {
+        var info = ParamInfos.Of(id);
+        var stack = new StackPanel();
+
+        var headerRow = new DockPanel();
+        if (DisplayIcon(id) is string glyph)
+        {
+            var icon = new TextBlock
+            {
+                Text = glyph,
+                FontFamily = (FontFamily)FindResource("IconFontFamily"),
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Foreground = MutedBrush,
+                Margin = new Thickness(0, 0, 5, 0),
+            };
+            DockPanel.SetDock(icon, Dock.Left);
+            headerRow.Children.Add(icon);
+        }
+        var label = new TextBlock { Text = DisplayName(id), VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
+        DockPanel.SetDock(label, Dock.Left);
+        headerRow.Children.Add(label);
+
+        var stepOptions = new NoteDurationOption[NoteDuration.Steps.Length];
+        for (int i = 0; i < stepOptions.Length; i++) stepOptions[i] = new NoteDurationOption(NoteDuration.Steps[i].Label, NoteDurationRangeText(i));
+
+        var combo = new ComboBox
+        {
+            Margin = new Thickness(0, 8, 0, 0),
+            ItemsSource = stepOptions,
+            ItemTemplateSelector = OptionSelector,
+            SelectedIndex = NoteDuration.IndexOf(values[id]),
+        };
+
+        var resetButton = new Button
+        {
+            Content = new TextBlock
+            {
+                Text = "",
+                FontFamily = (FontFamily)FindResource("IconFontFamily"),
+                FontSize = 11,
+                Foreground = MutedBrush,
+            },
+            Style = (Style)FindResource("PlainIconButtonStyle"),
+            Padding = new Thickness(4, 2, 4, 2),
+            ToolTip = "Reset to default",
+            IsEnabled = !Approximately(values[id], info.Default),
+        };
+        resetButton.Click += (_, _) =>
+        {
+            string before = session.ExportProjectJson();
+            combo.SelectedIndex = NoteDuration.IndexOf(info.Default);
+            session.CommitLiveEdit(before);
+        };
+        DockPanel.SetDock(resetButton, Dock.Right);
+        headerRow.Children.Add(resetButton);
+
+        var proj = projectSnapshot ?? session.GetProjectCopy();
+        var macroLabel = BuildMacroLabel(DefaultMacros.ParamSourceOf(proj, target, id));
+        DockPanel.SetDock(macroLabel, Dock.Right);
+        headerRow.Children.Add(macroLabel);
+
+        combo.SelectionChanged += (_, _) =>
+        {
+            if (suppressParamsRefresh) return; // RefreshParamsLive echoing a live value, not the user picking one
+            if (combo.SelectedIndex < 0) return;
+            float value = NoteDuration.ValueFor(combo.SelectedIndex);
+            resetButton.IsEnabled = !Approximately(value, info.Default);
+            string before = session.ExportProjectJson();
+            onChange(id, value);
+            session.CommitLiveEdit(before);
+        };
+
+        stack.Children.Add(headerRow);
+        stack.Children.Add(combo);
+
+        var container = new Border { Padding = new Thickness(4, 8, 4, 8), Margin = new Thickness(0, 0, 0, 4), Child = stack };
+        paramCombos[id] = combo;
+        return container;
+    }
+
     private UIElement BuildSliderRow(ParamId id, ParamSet values, TargetRef target, Action<ParamId, float> onChange)
     {
+        if (id == ParamId.EffectSpeed) return BuildNoteDurationRow(id, values, target, onChange);
+
         var info = ParamInfos.Of(id);
         var stack = new StackPanel();
 
@@ -1499,11 +1611,16 @@ public partial class SonolumeView : UserControl
         var label = new TextBlock { Text = "Blend", Width = 60, VerticalAlignment = VerticalAlignment.Center, Foreground = MutedBrush };
         var proj = projectSnapshot ?? session.GetProjectCopy();
         var macroLabel = BuildMacroLabel(DefaultMacros.BlendSourceOf(proj, target));
-        var combo = new ComboBox { ItemsSource = Enum.GetValues<BlendMode>(), SelectedItem = zone.Blend };
+        var combo = new ComboBox
+        {
+            ItemsSource = BlendOptions,
+            ItemTemplateSelector = OptionSelector,
+            SelectedItem = Array.Find(BlendOptions, o => o.Mode == zone.Blend),
+        };
         combo.SelectionChanged += (_, _) =>
         {
             if (suppressBlendCombo) return; // a live macro update, not the user picking a blend mode
-            if (combo.SelectedItem is BlendMode mode) onChange(mode);
+            if (combo.SelectedItem is BlendOption option) onChange(option.Mode);
         };
         DockPanel.SetDock(label, Dock.Left);
         DockPanel.SetDock(macroLabel, Dock.Right);
@@ -1623,6 +1740,77 @@ public partial class SonolumeView : UserControl
     private static string Fmt(float v) => v.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static string FmtPercent(float v01) => (v01 * 100f).ToString("0", CultureInfo.InvariantCulture);
+
+    /// <summary>Renders a normalized 0..1 boundary as a 7-bit MIDI CC value (0-127) - the resolution most control
+    /// surfaces actually send, even though the engine itself carries every source (CC, pitch bend, velocity) at
+    /// 14-bit precision internally (see <see cref="MidiEvent"/>). A hint in these units, not raw 0..1 or a percent,
+    /// is what matches the number a MIDI controller/DAW shows the user for a plain CC knob.</summary>
+    private static int ToMidi127(float v01) => (int)MathF.Round(Math.Clamp(v01, 0f, 1f) * 127f);
+
+    /// <summary>The MIDI-side (0-127) window that lands on option <paramref name="index"/> of <paramref name="count"/>
+    /// equal slices - mirrors <see cref="Engine.Engine.SelectEffect"/>/SelectBlend's own slicing so the hint shown
+    /// next to each dropdown option matches what actually picks it live.</summary>
+    private static string EqualSliceRangeText(int index, int count) =>
+        $"{ToMidi127(index / (float)count)}–{ToMidi127((index + 1) / (float)count)}";
+
+    /// <summary>The MIDI-side (0-127) window that lands on step <paramref name="index"/> of
+    /// <see cref="NoteDuration.Steps"/> - mirrors <see cref="NoteDuration.IndexOf"/>'s round-to-nearest boundary
+    /// (not equal slices, since that method rounds rather than floors) so the hint matches what picks it live.</summary>
+    private static string NoteDurationRangeText(int index)
+    {
+        int lastIndex = NoteDuration.Steps.Length - 1;
+        int fromFastest = lastIndex - index;
+        float lo = Math.Max(0f, (fromFastest - 0.5f) / lastIndex);
+        float hi = Math.Min(1f, (fromFastest + 0.5f) / lastIndex);
+        return $"{ToMidi127(lo)}–{ToMidi127(hi)}";
+    }
+
+    /// <summary>Dropdown item look for the effect Type/Speed combos: the option's label with its MIDI-side trigger
+    /// range in muted text pinned to the right. Only for the open popup list - the closed selection box uses
+    /// <see cref="OptionLabelOnlyTemplate"/> instead (picked by <see cref="OptionTemplateSelector"/>), since it has
+    /// no room to right-align anything against (its <c>ContentPresenter</c> sizes to content, not the combo's width).</summary>
+    private static readonly DataTemplate OptionWithRangeTemplate = BuildOptionTemplate(showRange: true);
+
+    private static readonly DataTemplate OptionLabelOnlyTemplate = BuildOptionTemplate(showRange: false);
+
+    /// <summary>Picks <see cref="OptionWithRangeTemplate"/> for items in the open popup list and
+    /// <see cref="OptionLabelOnlyTemplate"/> for the closed combo's own selection box - the only hook that tells
+    /// these two rendering sites apart, since WPF has no settable way to give the closed box its own
+    /// <see cref="ComboBox.ItemTemplate"/>. In both cases <paramref name="container"/> is a plain
+    /// <c>ContentPresenter</c> (DarkTheme.xaml's ComboBoxItem template wraps its content in one, same as the
+    /// ComboBox's own closed-box "ContentSite") - not a <see cref="ComboBoxItem"/> itself - so the only way to tell
+    /// them apart is whose template that presenter came from: a popup row's presenter belongs to the
+    /// <see cref="ComboBoxItem"/> template, the closed box's belongs to the ComboBox template directly.</summary>
+    private sealed class OptionTemplateSelector : DataTemplateSelector
+    {
+        public override DataTemplate SelectTemplate(object item, DependencyObject container) =>
+            container is FrameworkElement { TemplatedParent: ComboBoxItem } ? OptionWithRangeTemplate : OptionLabelOnlyTemplate;
+    }
+
+    private static readonly DataTemplateSelector OptionSelector = new OptionTemplateSelector();
+
+    private static DataTemplate BuildOptionTemplate(bool showRange)
+    {
+        var label = new FrameworkElementFactory(typeof(TextBlock));
+        label.SetBinding(TextBlock.TextProperty, new Binding("Label"));
+        label.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        if (!showRange) return new DataTemplate { VisualTree = label };
+
+        var range = new FrameworkElementFactory(typeof(TextBlock));
+        range.SetBinding(TextBlock.TextProperty, new Binding("Range"));
+        range.SetValue(DockPanel.DockProperty, Dock.Right);
+        range.SetValue(TextBlock.ForegroundProperty, MutedBrush);
+        range.SetValue(TextBlock.FontSizeProperty, 11.0);
+        range.SetValue(TextBlock.MarginProperty, new Thickness(16, 0, 0, 0));
+        range.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+        var panel = new FrameworkElementFactory(typeof(DockPanel));
+        panel.AppendChild(range);
+        panel.AppendChild(label);
+
+        return new DataTemplate { VisualTree = panel };
+    }
 
     private static string FmtSlider(ParamId id, ParamInfo info, float v) => id switch
     {

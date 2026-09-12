@@ -361,26 +361,18 @@
         <StackPanel Grid.Row="2" Margin="0,20,0,0">
             <Border Style="{StaticResource HorizontalDividerStyle}" Margin="0,0,0,12" />
             <DockPanel LastChildFill="False">
-                <StackPanel Orientation="Horizontal" DockPanel.Dock="Right" VerticalAlignment="Center">
-                    <TextBlock x:Name="MidiText" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                               Style="{StaticResource CaptionTextStyle}" Text="MIDI: 0 events" Margin="0,0,14,0" />
-                    <Border Background="{StaticResource InputBackgroundBrush}" BorderBrush="{StaticResource InputBorderBrush}"
-                            BorderThickness="1" CornerRadius="10" Padding="10,4">
-                        <StackPanel Orientation="Horizontal">
-                            <StackPanel x:Name="SignalRgbStatusPanel" Orientation="Horizontal" VerticalAlignment="Center" ToolTipService.InitialShowDelay="200">
-                                <Ellipse x:Name="StatusDot" Width="8" Height="8" VerticalAlignment="Center"
-                                         Stroke="{StaticResource InputBorderBrush}" StrokeThickness="1" Fill="Transparent" />
-                                <TextBlock Text="SignalRGB" Margin="6,0,0,0" Style="{StaticResource CaptionTextStyle}" />
-                            </StackPanel>
-                            <Border Width="1" Margin="10,1" Background="{StaticResource InputBorderBrush}" />
-                            <TextBlock x:Name="StatusMsText" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
-                            <TextBlock Text="&#183;" VerticalAlignment="Center" Margin="6,0" Style="{StaticResource CaptionTextStyle}" />
-                            <TextBlock x:Name="StatusFramesText" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
-                            <TextBlock x:Name="StatusDroppedText" VerticalAlignment="Center" Margin="6,0,0,0" TextTrimming="CharacterEllipsis"
-                                       Style="{StaticResource CaptionTextStyle}" />
+                <Border DockPanel.Dock="Right" Background="{StaticResource InputBackgroundBrush}" BorderBrush="{StaticResource InputBorderBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="10,4">
+                    <StackPanel Orientation="Horizontal">
+                        <StackPanel x:Name="SignalRgbStatusPanel" Orientation="Horizontal" VerticalAlignment="Center" ToolTipService.InitialShowDelay="200">
+                            <Ellipse x:Name="StatusDot" Width="8" Height="8" VerticalAlignment="Center"
+                                     Stroke="{StaticResource InputBorderBrush}" StrokeThickness="1" Fill="Transparent" />
+                            <TextBlock Text="SignalRGB" Margin="6,0,0,0" Style="{StaticResource CaptionTextStyle}" />
                         </StackPanel>
-                    </Border>
-                </StackPanel>
+                        <Border Width="1" Margin="10,1" Background="{StaticResource InputBorderBrush}" />
+                        <TextBlock x:Name="StatusMsText" VerticalAlignment="Center" Style="{StaticResource CaptionTextStyle}" />
+                    </StackPanel>
+                </Border>
             </DockPanel>
         </StackPanel>
     </Grid>

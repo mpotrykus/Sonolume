@@ -34,7 +34,7 @@ public class RainbowEffectTests
         Span<Rgb8> cellsAtStart = stackalloc Rgb8[1];
         rainbow.Render(cellsAtStart, 1, 1, Params());
 
-        for (int i = 0; i < 60; i++) rainbow.Update(1f / 60f, Params());
+        for (int i = 0; i < 12; i++) rainbow.Update(1f / 60f, Params()); // partway through a cycle, not a full period (which would wrap back to the same hue)
         Span<Rgb8> cellsLater = stackalloc Rgb8[1];
         rainbow.Render(cellsLater, 1, 1, Params());
 
